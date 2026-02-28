@@ -1,0 +1,18 @@
+{
+  "services": [
+    {
+      "type": "app",
+      "name": "clickup",
+      "source": {
+        "type": "git",
+        "repo": "https://github.com/jhanryw/clickup.git"
+      },
+      "buildCommand": "npm install --legacy-peer-deps && npm run build",
+      "startCommand": "npm start",
+      "port": 3000,
+      "env": {
+        "NODE_ENV": "production"
+      }
+    }
+  ]
+}

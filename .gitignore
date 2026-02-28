@@ -1,0 +1,38 @@
+# Dependências
+/node_modules
+/.pnp
+.pnp.js
+
+# Build Next.js
+/.next/
+/out/
+
+# Ambiente — NUNCA commite arquivos .env com secrets reais
+.env
+.env.local
+.env.*.local
+# .env.example é seguro commitar (sem valores reais)
+
+# Supabase local
+/supabase/.branches
+/supabase/.temp
+
+# Debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Vercel
+.vercel
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/settings.json
+.idea/

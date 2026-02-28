@@ -1,0 +1,33 @@
+# Configuração do Supabase CLI para desenvolvimento local.
+# Para produção (Easypanel), use as variáveis de ambiente diretamente.
+
+[api]
+port = 54321
+schemas = ["public", "storage", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 15
+
+[studio]
+port = 54323
+api_url = "http://localhost"
+
+[inbucket]
+port = 54324
+smtp_port = 54325
+pop3_port = 54326
+
+[storage]
+file_size_limit = "50MiB"
+
+[auth]
+site_url = "http://localhost:3000"
+additional_redirect_urls = [
+  "http://localhost:3000/api/logto/sign-in-callback"
+]
+jwt_expiry = 3600
+enable_signup = true
