@@ -6,8 +6,7 @@
 
 'use client'
 
-import { signOut } from '@logto/next/server-actions'
-import { logtoConfig } from '@/app/logto'
+import { signOutAction } from '@/app/actions/auth'
 import { useState } from 'react'
 
 type Props = {
@@ -21,7 +20,7 @@ export function SignOutButton({ className, variant = 'button' }: Props) {
   const handleSignOut = async () => {
     setIsLoading(true)
     try {
-      await signOut(logtoConfig)
+      await signOutAction()
     } catch (error) {
       console.error('[SignOut Error]', error)
       setIsLoading(false)

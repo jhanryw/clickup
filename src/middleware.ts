@@ -22,7 +22,7 @@ import { logtoConfig } from '@/app/logto'
 // Rotas que não precisam de autenticação
 const PUBLIC_ROUTES = [
   '/login',
-  '/app/callback',     // Callback do LogTo
+  '/callback',         // Callback do LogTo
   '/f/',               // Formulários públicos
   '/api/forms',        // API pública de submissão
   '/api/webhooks/incoming', // Webhook de entrada

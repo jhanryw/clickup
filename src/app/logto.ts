@@ -13,7 +13,7 @@ import type { LogtoNextConfig } from '@logto/next'
 
 export const logtoConfig: LogtoNextConfig = {
   endpoint: process.env.NEXT_PUBLIC_LOGTO_ENDPOINT ?? 'https://clickup-logto.vodct5.easypanel.host/',
-  appId: process.env.NEXT_PUBLIC_LOGTO_APP_ID ?? 'vh99mdgamkufoptzjrccj',
+  appId: process.env.NEXT_PUBLIC_LOGTO_APP_ID ?? 'obvvnp6ppfozr1m81qcr2',
   appSecret: process.env.LOGTO_APP_SECRET ?? '',
   baseUrl: process.env.NEXTAUTH_URL ?? 'http://localhost:3000',
   cookieSecret: process.env.LOGTO_COOKIE_SECRET ?? '',

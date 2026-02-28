@@ -9,41 +9,23 @@
  * Importe este arquivo APENAS em Server Components, Server Actions e middleware.
  */
 
-import LogtoClient from '@logto/next'
+import { getLogtoContext } from '@logto/next/server-actions'
 import { getLogtoConfig } from './config'
 import { upsertUserProfile } from '@/lib/supabase/server'
 import type { UserContext } from '@/types/database'
 
-// Singleton do cliente LogTo (server-side)
-let _logtoClient: LogtoClient | null = null
-
-function getLogtoClient(): LogtoClient {
-  if (!_logtoClient) {
-    _logtoClient = new LogtoClient(getLogtoConfig())
-  }
-  return _logtoClient
-}
-
-export { getLogtoClient }
-
 /**
- * Pega o contexto do usuário autenticado a partir do request atual.
+ * Pega o contexto do usuário autenticado.
  * Retorna null se não autenticado.
  *
- * USO em Server Components:
- *   const user = await getAuthUser(request)
- *   if (!user) redirect('/login')
+ * USO em Server Components, Server Actions e API Routes.
  */
-export async function getAuthUser(request: Request): Promise<UserContext | null> {
+export async function getAuthUser(): Promise<UserContext | null> {
   try {
-    const client = getLogtoClient()
-    const nodeClient = await client.createNodeClient(request as Parameters<typeof client.createNodeClient>[0])
+    const config = getLogtoConfig()
+    const { isAuthenticated, claims } = await getLogtoContext(config)
 
-    const isAuthenticated = await nodeClient.isAuthenticated()
-    if (!isAuthenticated) return null
-
-    const claims = await nodeClient.getClaims()
-    if (!claims) return null
+    if (!isAuthenticated || !claims) return null
 
     // O LogTo retorna roles no campo 'roles' dos custom data ou no JWT
     const logtoRoles: string[] = (claims as Record<string, unknown>)['roles'] as string[] ?? []
@@ -56,7 +38,8 @@ export async function getAuthUser(request: Request): Promise<UserContext | null>
       logto_roles: logtoRoles,
       org_role: null, // Preenchido ao buscar o contexto da organização
     }
-  } catch {
+  } catch (error) {
+    console.error('[getAuthUser Error]', error)
     return null
   }
 }
@@ -65,8 +48,8 @@ export async function getAuthUser(request: Request): Promise<UserContext | null>
  * Após o callback de login do LogTo, sincroniza o perfil no Supabase
  * e retorna o UserContext completo.
  */
-export async function handlePostLogin(request: Request): Promise<UserContext | null> {
-  const user = await getAuthUser(request)
+export async function handlePostLogin(): Promise<UserContext | null> {
+  const user = await getAuthUser()
   if (!user) return null
 
   // Sincroniza perfil no Supabase (upsert)

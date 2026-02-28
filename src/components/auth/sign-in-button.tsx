@@ -6,8 +6,7 @@
 
 'use client'
 
-import { signIn } from '@logto/next/server-actions'
-import { logtoConfig } from '@/app/logto'
+import { signInAction } from '@/app/actions/auth'
 import { useState } from 'react'
 
 type Props = {
@@ -20,7 +19,7 @@ export function SignInButton({ className }: Props) {
   const handleSignIn = async () => {
     setIsLoading(true)
     try {
-      await signIn(logtoConfig)
+      await signInAction()
     } catch (error) {
       console.error('[SignIn Error]', error)
       setIsLoading(false)

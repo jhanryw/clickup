@@ -109,7 +109,7 @@ export async function requireTaskAccess(
   if (!task) throw new Error('Tarefa não encontrada.')
 
   // Extrai org_id da hierarquia
-  const list = task.lists as Record<string, unknown>
+  const list = task.lists as unknown as Record<string, unknown>
   const space = (list?.spaces ?? (list?.folders as Record<string, unknown>)?.spaces) as { organization_id: string } | null
   const orgId = space?.organization_id
 
