@@ -1,26 +1,21 @@
 /**
- * Configuração do LogTo.
+ * Configuração do LogTo — Fonte única de verdade.
  *
- * IMPORTANTE: Você precisa configurar as Redirect URIs no Console do LogTo:
+ * Lido a partir de variáveis de ambiente para funcionar
+ * tanto em desenvolvimento (localhost) quanto em produção (Easypanel).
  *
- * 1. No Console LogTo:
- *    - Vá em Applications > seu app > Redirect URIs
- *    - Adicione: http://localhost:3000/app/callback (desenvolvimento)
- *    - Adicione: https://seu-dominio.com/app/callback (produção)
- *
- * 2. Post Sign-out Redirect URI:
- *    - Vá em Applications > seu app > Post sign-out redirect URIs
- *    - Adicione: http://localhost:3000/login (desenvolvimento)
- *    - Adicione: https://seu-dominio.com/login (produção)
- *
- * 3. Clique em "Save changes"
+ * IMPORTANTE: Configure as Redirect URIs no Console do LogTo:
+ *   - Redirect URI: {NEXTAUTH_URL}/app/callback
+ *   - Post sign-out: {NEXTAUTH_URL}/login
  */
 
-export const logtoConfig = {
-  endpoint: 'https://clickup-logto.vodct5.easypanel.host/',
-  appId: 'vh99mdgamkufoptzjrccj',
-  appSecret: '91VIel4wR718XwE4bZwDaCnxCBhFktws',
-  baseUrl: 'http://localhost:3000', // Mude para URL pública em produção
-  cookieSecret: '7qnnCvzP47AskCTfnLs7cWoC6LuL5axl',
+import type { LogtoNextConfig } from '@logto/next'
+
+export const logtoConfig: LogtoNextConfig = {
+  endpoint: process.env.NEXT_PUBLIC_LOGTO_ENDPOINT ?? 'https://clickup-logto.vodct5.easypanel.host/',
+  appId: process.env.NEXT_PUBLIC_LOGTO_APP_ID ?? 'vh99mdgamkufoptzjrccj',
+  appSecret: process.env.LOGTO_APP_SECRET ?? '',
+  baseUrl: process.env.NEXTAUTH_URL ?? 'http://localhost:3000',
+  cookieSecret: process.env.LOGTO_COOKIE_SECRET ?? '',
   cookieSecure: process.env.NODE_ENV === 'production',
-} as const
+}

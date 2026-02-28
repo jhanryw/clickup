@@ -23,3 +23,13 @@ O sistema deve seguir obrigatoriamente esta estrutura:
 - **Backend/Banco:** Supabase (PostgreSQL, Realtime para updates de tarefas).
 - **Autenticação:** LogTo (para gestão de permissões e usuários).
 - **E-mail/Marketing:** Listmonk (integração para notificações e newsletters internas).
+
+## 5. Visualizações de Tarefas
+O sistema deve permitir alternar entre:
+- **List View:** Visão clássica detalhada.
+- **Kanban Board:** Arrastar tarefas entre colunas de status.
+- **Calendar View:** Visualização de prazos e entregas em um calendário mensal/semanal.
+
+## 6. Automação (Webhooks)
+- **Saída:** Trigger ao alterar status (ex: enviar para o Slack do cliente).
+- **Entrada:** Formulário público para clientes criarem tickets sem login.
