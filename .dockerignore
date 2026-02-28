@@ -14,11 +14,10 @@ coverage
 .DS_Store
 .vscode
 .idea
+.claude
+supabase
+docker-compose.yml
 README.md
 LOGTO_SETUP.md
 LOGTO_LOCAL_DEV.md
-DEPLOY_EASYPANEL.md
-DOCKER_TROUBLESHOOTING.md
-docker-compose.yml
-supabase
-.claude
+*.md

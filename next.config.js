@@ -1,9 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Nota: Turbopack não suporta experimental.typedRoutes
-  // experimental: {
-  //   typedRoutes: true,
-  // },
+  output: 'standalone',
 
   images: {
     remotePatterns: [
