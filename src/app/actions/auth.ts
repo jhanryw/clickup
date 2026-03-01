@@ -4,9 +4,11 @@ import { signIn as logtoSignIn, signOut as logtoSignOut } from '@logto/next/serv
 import { logtoConfig } from '@/app/logto';
 
 export async function signInAction() {
-    await logtoSignIn(logtoConfig);
+    const baseUrl = process.env.NEXTAUTH_URL ?? 'http://localhost:3000';
+    await logtoSignIn(logtoConfig, { redirectUri: `${baseUrl}/callback` });
 }
 
 export async function signOutAction() {
-    await logtoSignOut(logtoConfig);
+    const baseUrl = process.env.NEXTAUTH_URL ?? 'http://localhost:3000';
+    await logtoSignOut(logtoConfig, `${baseUrl}/login`);
 }

@@ -19,12 +19,8 @@ export function SignOutButton({ className, variant = 'button' }: Props) {
 
   const handleSignOut = async () => {
     setIsLoading(true)
-    try {
-      await signOutAction()
-    } catch (error) {
-      console.error('[SignOut Error]', error)
-      setIsLoading(false)
-    }
+    await signOutAction()
+    setIsLoading(false)
   }
 
   if (variant === 'link') {

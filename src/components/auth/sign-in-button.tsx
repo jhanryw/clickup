@@ -18,12 +18,8 @@ export function SignInButton({ className }: Props) {
 
   const handleSignIn = async () => {
     setIsLoading(true)
-    try {
-      await signInAction()
-    } catch (error) {
-      console.error('[SignIn Error]', error)
-      setIsLoading(false)
-    }
+    await signInAction()
+    setIsLoading(false)
   }
 
   return (
