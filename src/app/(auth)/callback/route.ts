@@ -18,6 +18,7 @@ import { getLogtoContext } from '@logto/next/server-actions'
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
 
+  let success = false;
   try {
     // Valida a resposta do LogTo e cria a sessão
     await handleSignIn(logtoConfig, searchParams)
@@ -34,12 +35,14 @@ export async function GET(request: NextRequest) {
         avatar_url: claims.picture as string | undefined,
       })
     }
-
-    // Redireciona para o dashboard
-    redirect('/')
+    success = true;
   } catch (error) {
     console.error('[LogTo Callback]', error)
-    // Em caso de erro, redireciona para login
+  }
+
+  if (success) {
+    redirect('/')
+  } else {
     redirect('/login')
   }
 }
