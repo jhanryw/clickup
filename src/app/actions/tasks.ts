@@ -195,8 +195,11 @@ export async function updateTaskStatus(taskId: string, statusId: string) {
 
     if (error) throw new Error(error.message)
 
-    // Se concluiu a tarefa, dispara webhook de saída (se configurado) via fetch
+    // Se concluiu a tarefa, dispara:
+    // 1. Webhook de saída
+    // 2. Email Listmonk de "Entrega Concluída"
     if (statusInfo.is_closed && taskUpdate) {
+      // Webhook
       const url = process.env.OUTGOING_WEBHOOK_URL
       if (url) {
         try {
@@ -213,6 +216,38 @@ export async function updateTaskStatus(taskId: string, statusId: string) {
           })
         } catch (err) {
           console.error('[Webhook] Falha ao enviar task_completed', err)
+        }
+      }
+
+      // Listmonk: Email de "Entrega Concluída" para os assignees da task
+      const completionTemplateId = parseInt(process.env.LISTMONK_COMPLETION_TEMPLATE_ID || '0')
+      if (completionTemplateId > 0) {
+        try {
+          const { data: assignees } = await db
+            .from('task_assignees')
+            .select('user_id, profiles ( email, full_name )')
+            .eq('task_id', taskId)
+
+          if (assignees && assignees.length > 0) {
+            for (const a of assignees) {
+              const profile = (a as any).profiles
+              if (profile?.email) {
+                await sendTransactionalEmail({
+                  subscriberEmail: profile.email,
+                  subscriberName: profile.full_name || undefined,
+                  templateId: completionTemplateId,
+                  data: {
+                    task_title: taskUpdate.title,
+                    task_id: taskUpdate.id,
+                    completed_by: userId,
+                    status_name: statusInfo.name,
+                  },
+                })
+              }
+            }
+          }
+        } catch (emailErr) {
+          console.error('[Listmonk] Falha ao enviar email de conclusão', emailErr)
         }
       }
     }

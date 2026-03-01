@@ -95,3 +95,23 @@
   background-size: 200% 200%;
   animation: gradient-shift 6s ease infinite;
 }
+
+/* Calendar: dot indicator for days with tasks */
+.has-tasks-dot {
+  position: relative;
+}
+.has-tasks-dot::after {
+  content: '';
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background-color: #6366f1;
+}
+
+/* Hide scrollbar utility */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
