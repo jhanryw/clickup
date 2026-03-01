@@ -18,10 +18,13 @@ function getServerEnv() {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
 
   if (!url || !key) {
-    throw new Error(
-      'SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY são obrigatórias para o cliente server-side. ' +
-      'Configure no .env.local (nunca as coloque em NEXT_PUBLIC_*).'
+    console.error(
+      '[Supabase] SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY não configuradas. ' +
+      'Verifique as variáveis de ambiente no Easypanel/Dockerfile.'
     )
+    // Retorna valores vazios para evitar crash durante SSR/build.
+    // As queries vão falhar gracefully em vez de derrubar o servidor.
+    return { url: url || '', key: key || '' }
   }
   return { url, key }
 }
