@@ -108,7 +108,7 @@ export default async function OrgPage({ params, searchParams }: PageProps) {
             </div>
 
             {/* Task Views Component */}
-            <TaskViews tasks={tasks} statuses={statuses} />
+            <TaskViews tasks={tasks} statuses={statuses} listId={searchParams.listId || null} />
         </div>
     )
 }

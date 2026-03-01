@@ -5,15 +5,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ListView } from "./list-view"
 import { BoardView } from "./board-view"
 import { CalendarView } from "./calendar-view"
-import { LayoutList, KanbanSquare, CalendarDays, Plus } from 'lucide-react'
-import { Button } from "@/components/ui/button"
+import { CreateTaskDialog } from "@/components/dialogs/create-task-dialog"
+import { LayoutList, KanbanSquare, CalendarDays } from 'lucide-react'
 
 interface TaskViewsProps {
     tasks: any[]
     statuses: any[]
+    listId?: string | null
 }
 
-export function TaskViews({ tasks, statuses }: TaskViewsProps) {
+export function TaskViews({ tasks, statuses, listId }: TaskViewsProps) {
     const [activeTab, setActiveTab] = useState('list')
 
     return (
@@ -36,9 +37,9 @@ export function TaskViews({ tasks, statuses }: TaskViewsProps) {
                     </TabsList>
 
                     <div className="flex gap-3">
-                        <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white">
-                            <Plus className="h-4 w-4 mr-2" /> Nova Tarefa
-                        </Button>
+                        {listId && (
+                            <CreateTaskDialog listId={listId} statuses={statuses} />
+                        )}
                     </div>
                 </div>
 

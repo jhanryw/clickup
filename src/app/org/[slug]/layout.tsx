@@ -3,8 +3,9 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createServiceClient, withUserContext } from '@/lib/supabase/server'
 import { SignOutButton } from '@/components/auth/sign-out-button'
-import { ChevronRight, Folder as FolderIcon, LayoutDashboard, LayoutList, Settings, Users } from 'lucide-react'
+import { LayoutDashboard, Settings, Users } from 'lucide-react'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { HierarchySection } from '@/components/sidebar/hierarchy-section'
 
 interface SpaceHierarchyNode {
     id: string
@@ -120,71 +121,13 @@ export default async function OrgLayout({
                     ) : null}
                 </div>
 
-                {/* Hierarquia: Spaces */}
-                <div className="px-3 pt-4 pb-2 flex items-center justify-between">
-                    <p className="px-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                        Espaços ({hierarchy.length})
-                    </p>
-                </div>
-
-                <ScrollArea className="flex-1 px-2">
-                    {hierarchy.length === 0 ? (
-                        <p className="px-3 py-2 text-xs text-zinc-500 text-center mt-4">
-                            Sem espaços criados.
-                        </p>
-                    ) : (
-                        <div className="space-y-2 pb-4">
-                            {hierarchy.map(space => (
-                                <div key={space.id} className="space-y-1">
-                                    {/* Space Item */}
-                                    <div className="group flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-zinc-200 hover:bg-zinc-800 cursor-pointer">
-                                        <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-white text-[10px]" style={{ backgroundColor: space.color || '#4f46e5' }}>
-                                            {space.icon ? space.icon : space.name.charAt(0)}
-                                        </div>
-                                        <span className="flex-1 truncate font-medium">{space.name}</span>
-                                    </div>
-
-                                    {/* Folders in Space */}
-                                    {space.folders.length > 0 && (
-                                        <div className="ml-4 space-y-1 border-l border-zinc-800 pl-2">
-                                            {space.folders.map(folder => (
-                                                <div key={folder.id} className="space-y-1">
-                                                    <div className="flex items-center gap-2 rounded-md px-2 py-1 text-sm text-zinc-300 hover:bg-zinc-800 cursor-pointer">
-                                                        <FolderIcon className="h-3.5 w-3.5 text-zinc-400" />
-                                                        <span className="truncate">{folder.name}</span>
-                                                    </div>
-
-                                                    {/* Lists in Folder */}
-                                                    {folder.lists.length > 0 && (
-                                                        <div className="ml-3 space-y-1 pl-2">
-                                                            {folder.lists.map(list => (
-                                                                <Link href={`/org/${params.slug}?listId=${list.id}`} key={list.id} className="flex items-center gap-2 rounded-md px-2 py-1 text-[13px] text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-colors">
-                                                                    <LayoutList className="h-3 w-3" style={{ color: list.color || 'inherit' }} />
-                                                                    <span className="truncate">{list.name}</span>
-                                                                </Link>
-                                                            ))}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-
-                                    {/* Direct Lists in Space */}
-                                    {space.direct_lists.length > 0 && (
-                                        <div className="ml-4 space-y-1 border-l border-zinc-800 pl-2">
-                                            {space.direct_lists.map(list => (
-                                                <Link href={`/org/${params.slug}?listId=${list.id}`} key={list.id} className="flex items-center gap-2 rounded-md px-2 py-1 text-[13px] text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-colors">
-                                                    <LayoutList className="h-3 w-3" style={{ color: list.color || 'inherit' }} />
-                                                    <span className="truncate">{list.name}</span>
-                                                </Link>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                    )}
+                {/* Hierarquia Interativa */}
+                <ScrollArea className="flex-1">
+                    <HierarchySection
+                        hierarchy={hierarchy}
+                        orgSlug={params.slug}
+                        organizationId={org.id}
+                    />
                 </ScrollArea>
 
                 {/* Footer do Usuário logado */}
