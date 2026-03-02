@@ -48,6 +48,42 @@ export default async function SettingsPage({ params }: PageProps) {
     .eq('organization_id', org.id)
     .order('created_at', { ascending: false })
 
+  // Buscar listas disponíveis para associar a formulários
+  const { data: spaces } = await db
+    .from('spaces')
+    .select('id')
+    .eq('organization_id', org.id)
+
+  const spaceIds = (spaces || []).map(s => s.id)
+
+  let lists: { id: string; name: string }[] = []
+  if (spaceIds.length > 0) {
+    // Listas diretas em spaces
+    const { data: directLists } = await db
+      .from('lists')
+      .select('id, name')
+      .in('space_id', spaceIds)
+
+    // Listas em folders
+    const { data: folders } = await db
+      .from('folders')
+      .select('id')
+      .in('space_id', spaceIds)
+
+    const folderIds = (folders || []).map(f => f.id)
+
+    let folderLists: { id: string; name: string }[] = []
+    if (folderIds.length > 0) {
+      const { data: fLists } = await db
+        .from('lists')
+        .select('id, name')
+        .in('folder_id', folderIds)
+      folderLists = fLists || []
+    }
+
+    lists = [...(directLists || []), ...folderLists]
+  }
+
   return (
     <div className="flex-1 overflow-y-auto pt-6 px-8 pb-12">
       <div className="max-w-3xl">
@@ -61,6 +97,7 @@ export default async function SettingsPage({ params }: PageProps) {
           orgSlug={params.slug}
           webhooks={webhooks || []}
           forms={forms || []}
+          lists={lists}
         />
       </div>
     </div>
