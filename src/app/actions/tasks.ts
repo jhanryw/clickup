@@ -275,6 +275,58 @@ const LISTMONK_ASSIGNMENT_TEMPLATE_ID = parseInt(
   process.env.LISTMONK_ASSIGNMENT_TEMPLATE_ID || '0'
 )
 
+export async function setTaskAssignees(taskId: string, userIds: string[]) {
+  return withPermission(async () => {
+    const userId = getUserId()
+    z.string().uuid().parse(taskId)
+
+    await requireTaskAccess(userId, taskId, 'member')
+
+    const db = createServiceClient()
+
+    // Snapshot dos atuais para diff de email
+    const { data: existing } = await db
+      .from('task_assignees')
+      .select('user_id')
+      .eq('task_id', taskId)
+
+    const existingIds = (existing || []).map((a) => a.user_id)
+    const addedIds = userIds.filter((id) => !existingIds.includes(id))
+
+    // Substitui todos
+    await db.from('task_assignees').delete().eq('task_id', taskId)
+
+    if (userIds.length > 0) {
+      await db.from('task_assignees').insert(
+        userIds.map((uid) => ({ task_id: taskId, user_id: uid, assigned_by: userId }))
+      )
+    }
+
+    // Envia email para recém-adicionados
+    const templateId = parseInt(process.env.LISTMONK_ASSIGNMENT_TEMPLATE_ID || '0')
+    if (templateId > 0 && addedIds.length > 0) {
+      const { data: taskData } = await db.from('tasks').select('title').eq('id', taskId).single()
+      for (const uid of addedIds) {
+        const { data: profile } = await db
+          .from('profiles')
+          .select('email, full_name')
+          .eq('id', uid)
+          .single()
+        if (profile?.email) {
+          await sendTransactionalEmail({
+            subscriberEmail: profile.email,
+            subscriberName: profile.full_name || undefined,
+            templateId,
+            data: { task_title: taskData?.title, task_id: taskId },
+          }).catch(() => {/* silencia erro de email */})
+        }
+      }
+    }
+
+    return { success: true }
+  })
+}
+
 export async function assignTask(taskId: string, assigneeUserId: string) {
   return withPermission(async () => {
     const userId = getUserId()

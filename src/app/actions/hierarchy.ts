@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { CreateSpaceSchema, CreateFolderSchema, CreateListSchema } from '@/lib/validators'
 import { withPermission, requireOrgRole, requireSpaceAccess } from '@/lib/permissions'
 import { createServiceClient } from '@/lib/supabase/server'
+import { sendTransactionalEmail } from './listmonk'
 
 function getUserId(): string {
   const userId = headers().get('x-user-id')
@@ -312,6 +313,29 @@ export async function inviteMember(orgId: string, email: string, role: string) {
       invited_by: userId,
     })
     if (error) throw new Error(error.message)
+
+    // Email de convite via Listmonk (se configurado)
+    const inviteTemplateId = parseInt(process.env.LISTMONK_INVITE_TEMPLATE_ID || '0')
+    if (inviteTemplateId > 0) {
+      try {
+        const { data: orgData } = await db
+          .from('organizations')
+          .select('name')
+          .eq('id', orgId)
+          .single()
+        await sendTransactionalEmail({
+          subscriberEmail: email.toLowerCase(),
+          subscriberName: email.split('@')[0],
+          templateId: inviteTemplateId,
+          data: {
+            org_name: orgData?.name || 'Qarvon',
+            role,
+          },
+        })
+      } catch (emailErr) {
+        console.error('[Listmonk] Falha ao enviar email de convite', emailErr)
+      }
+    }
 
     return {
       success: true,

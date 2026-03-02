@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { FolderPlus } from 'lucide-react'
+import { FolderPlus, Lock } from 'lucide-react'
 
 interface CreateFolderDialogProps {
   spaceId: string
@@ -17,6 +17,7 @@ export function CreateFolderDialog({ spaceId }: CreateFolderDialogProps) {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isPrivate, setIsPrivate] = useState(false)
   const router = useRouter()
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -31,7 +32,7 @@ export function CreateFolderDialog({ spaceId }: CreateFolderDialogProps) {
       const result = await createFolder({
         space_id: spaceId,
         name,
-        is_private: false,
+        is_private: isPrivate,
       })
 
       if ('error' in result && result.error) {
@@ -73,6 +74,30 @@ export function CreateFolderDialog({ spaceId }: CreateFolderDialogProps) {
               className="bg-zinc-950 border-zinc-700 text-zinc-200 placeholder:text-zinc-600"
             />
           </div>
+
+          {/* Pasta Privada */}
+          <label className="flex items-center gap-2.5 cursor-pointer group">
+            <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-md border transition-colors ${
+              isPrivate ? 'bg-indigo-600/20 border-indigo-500/40' : 'border-zinc-700 bg-zinc-950'
+            }`}>
+              <Lock className={`h-4 w-4 ${isPrivate ? 'text-indigo-400' : 'text-zinc-600'}`} />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-zinc-300">Pasta Privada</p>
+              <p className="text-xs text-zinc-600">
+                {isPrivate
+                  ? 'Somente membros adicionados explicitamente terão acesso'
+                  : 'Todos os membros do space poderão ver esta pasta'
+                }
+              </p>
+            </div>
+            <input
+              type="checkbox"
+              className="sr-only"
+              checked={isPrivate}
+              onChange={(e) => setIsPrivate(e.target.checked)}
+            />
+          </label>
 
           {error && (
             <p className="text-sm text-red-400 bg-red-950/30 px-3 py-2 rounded">{error}</p>

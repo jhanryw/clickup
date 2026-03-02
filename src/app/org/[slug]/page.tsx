@@ -26,6 +26,18 @@ export default async function OrgPage({ params, searchParams }: PageProps) {
 
     if (!org) redirect('/')
 
+    // Buscar membros da org para o picker de responsáveis
+    const { data: orgMembers } = await db
+        .from('organization_members')
+        .select('user_id, profiles ( full_name, email )')
+        .eq('organization_id', org.id)
+
+    const members = (orgMembers || []).map((m: any) => ({
+        userId: m.user_id,
+        displayName: m.profiles?.full_name || m.profiles?.email?.split('@')[0] || m.user_id.substring(0, 8),
+        email: m.profiles?.email || '',
+    }))
+
     let tasks: any[] = []
     let statuses: any[] = []
     let listName = ''
@@ -43,7 +55,7 @@ export default async function OrgPage({ params, searchParams }: PageProps) {
         const resTasks = await withUserContext(userId, async (ctxDb) => {
             const { data } = await ctxDb
                 .from('tasks')
-                .select(`*, custom_statuses ( id, name, color, is_closed, "order" )`)
+                .select(`*, custom_statuses ( id, name, color, is_closed, "order" ), task_assignees ( user_id )`)
                 .eq('list_id', listId)
                 .order('order', { ascending: true })
             return { data }
@@ -71,7 +83,7 @@ export default async function OrgPage({ params, searchParams }: PageProps) {
         const resTasks = await withUserContext(userId, async (ctxDb) => {
             const { data } = await ctxDb
                 .from('tasks')
-                .select(`*, custom_statuses ( id, name, color, is_closed, "order" )`)
+                .select(`*, custom_statuses ( id, name, color, is_closed, "order" ), task_assignees ( user_id )`)
                 .order('created_at', { ascending: false })
                 .limit(50)
             return { data }
@@ -218,7 +230,7 @@ export default async function OrgPage({ params, searchParams }: PageProps) {
                 </div>
             </div>
 
-            <TaskViews tasks={tasks} statuses={statuses} listId={searchParams.listId || null} />
+            <TaskViews tasks={tasks} statuses={statuses} listId={searchParams.listId || null} members={members} />
         </div>
     )
 }
