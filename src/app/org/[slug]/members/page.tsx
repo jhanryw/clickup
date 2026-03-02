@@ -41,7 +41,7 @@ export default async function MembersPage({ params }: PageProps) {
       user_id,
       role,
       created_at,
-      profiles ( id, display_name, email, avatar_url )
+      profiles ( id, full_name, email, avatar_url )
     `)
     .eq('organization_id', org.id)
     .order('created_at', { ascending: true })
@@ -50,7 +50,7 @@ export default async function MembersPage({ params }: PageProps) {
     userId: m.user_id,
     role: m.role,
     joinedAt: m.created_at,
-    displayName: m.profiles?.display_name || m.profiles?.email?.split('@')[0] || 'Sem nome',
+    displayName: m.profiles?.full_name || m.profiles?.email?.split('@')[0] || 'Sem nome',
     email: m.profiles?.email || '',
     avatarUrl: m.profiles?.avatar_url || null,
   }))

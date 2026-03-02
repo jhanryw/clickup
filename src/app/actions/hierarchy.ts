@@ -2,7 +2,7 @@
 
 import { headers } from 'next/headers'
 import { z } from 'zod'
-import { CreateSpaceSchema, CreateFolderSchema, CreateListSchema, InviteMemberSchema } from '@/lib/validators'
+import { CreateSpaceSchema, CreateFolderSchema, CreateListSchema } from '@/lib/validators'
 import { withPermission, requireOrgRole, requireSpaceAccess } from '@/lib/permissions'
 import { createServiceClient } from '@/lib/supabase/server'
 
@@ -11,6 +11,8 @@ function getUserId(): string {
   if (!userId) throw new Error('Não autenticado')
   return userId
 }
+
+// ─── CREATE ───────────────────────────────────────────────────────────
 
 export async function createSpace(input: z.infer<typeof CreateSpaceSchema>) {
   return withPermission(async () => {
@@ -46,7 +48,6 @@ export async function createFolder(input: z.infer<typeof CreateFolderSchema>) {
 
     await requireSpaceAccess(userId, parsed.space_id)
 
-    // Verifica se é ao menos membro da org
     const db = createServiceClient()
     const { data: space } = await db
       .from('spaces')
@@ -89,7 +90,6 @@ export async function createList(input: {
 
     const db = createServiceClient()
 
-    // Resolve space_id para verificar acesso
     let resolvedSpaceId = parsed.space_id
     if (!resolvedSpaceId && parsed.folder_id) {
       const { data: folder } = await db
@@ -103,7 +103,6 @@ export async function createList(input: {
     if (!resolvedSpaceId) throw new Error('Não foi possível determinar o space')
     await requireSpaceAccess(userId, resolvedSpaceId)
 
-    // Busca o primeiro status default para usar como default_status_id
     const { data: defaultStatus } = await db
       .from('custom_statuses')
       .select('id')
@@ -111,7 +110,6 @@ export async function createList(input: {
       .limit(1)
       .single()
 
-    // Insere a lista
     const { data: list, error } = await db
       .from('lists')
       .insert({
@@ -129,7 +127,6 @@ export async function createList(input: {
 
     if (error) throw new Error(error.message)
 
-    // Linka os statuses default à lista
     if (list) {
       const { data: allStatuses } = await db
         .from('custom_statuses')
@@ -137,12 +134,9 @@ export async function createList(input: {
         .order('order', { ascending: true })
 
       if (allStatuses && allStatuses.length > 0) {
-        const statusLinks = allStatuses.map((s) => ({
-          list_id: list.id,
-          status_id: s.id,
-          order: s.order,
-        }))
-        await db.from('list_statuses').insert(statusLinks)
+        await db.from('list_statuses').insert(
+          allStatuses.map((s) => ({ list_id: list.id, status_id: s.id, order: s.order }))
+        )
       }
     }
 
@@ -150,47 +144,218 @@ export async function createList(input: {
   })
 }
 
+// ─── RENAME ───────────────────────────────────────────────────────────
+
+export async function renameSpace(spaceId: string, name: string) {
+  return withPermission(async () => {
+    const userId = getUserId()
+    if (!name?.trim()) throw new Error('Nome inválido')
+
+    const db = createServiceClient()
+    const { data: space } = await db.from('spaces').select('organization_id').eq('id', spaceId).single()
+    if (!space) throw new Error('Space não encontrado')
+
+    await requireOrgRole(userId, space.organization_id, 'admin')
+
+    const { error } = await db.from('spaces').update({ name: name.trim() }).eq('id', spaceId)
+    if (error) throw new Error(error.message)
+    return { success: true }
+  })
+}
+
+export async function renameFolder(folderId: string, name: string) {
+  return withPermission(async () => {
+    const userId = getUserId()
+    if (!name?.trim()) throw new Error('Nome inválido')
+
+    const db = createServiceClient()
+    const { data: folder } = await db
+      .from('folders')
+      .select('space_id, spaces(organization_id)')
+      .eq('id', folderId)
+      .single()
+    if (!folder) throw new Error('Folder não encontrado')
+
+    const orgId = (folder.spaces as any)?.organization_id
+    await requireOrgRole(userId, orgId, 'member')
+
+    const { error } = await db.from('folders').update({ name: name.trim() }).eq('id', folderId)
+    if (error) throw new Error(error.message)
+    return { success: true }
+  })
+}
+
+export async function renameList(listId: string, name: string) {
+  return withPermission(async () => {
+    const userId = getUserId()
+    if (!name?.trim()) throw new Error('Nome inválido')
+
+    const db = createServiceClient()
+    const { data: list } = await db.from('lists').select('id').eq('id', listId).single()
+    if (!list) throw new Error('Lista não encontrada')
+
+    const { error } = await db.from('lists').update({ name: name.trim() }).eq('id', listId)
+    if (error) throw new Error(error.message)
+    return { success: true }
+  })
+}
+
+// ─── DELETE ───────────────────────────────────────────────────────────
+
+export async function deleteSpace(spaceId: string) {
+  return withPermission(async () => {
+    const userId = getUserId()
+
+    const db = createServiceClient()
+    const { data: space } = await db.from('spaces').select('organization_id').eq('id', spaceId).single()
+    if (!space) throw new Error('Space não encontrado')
+
+    await requireOrgRole(userId, space.organization_id, 'owner')
+
+    const { error } = await db.from('spaces').delete().eq('id', spaceId)
+    if (error) throw new Error(error.message)
+    return { success: true }
+  })
+}
+
+export async function deleteFolder(folderId: string) {
+  return withPermission(async () => {
+    const userId = getUserId()
+
+    const db = createServiceClient()
+    const { data: folder } = await db
+      .from('folders')
+      .select('space_id, spaces(organization_id)')
+      .eq('id', folderId)
+      .single()
+    if (!folder) throw new Error('Folder não encontrado')
+
+    const orgId = (folder.spaces as any)?.organization_id
+    await requireOrgRole(userId, orgId, 'admin')
+
+    const { error } = await db.from('folders').delete().eq('id', folderId)
+    if (error) throw new Error(error.message)
+    return { success: true }
+  })
+}
+
+export async function deleteList(listId: string) {
+  return withPermission(async () => {
+    const userId = getUserId()
+
+    const db = createServiceClient()
+    const { data: list } = await db.from('lists').select('id').eq('id', listId).single()
+    if (!list) throw new Error('Lista não encontrada')
+
+    const { error } = await db.from('lists').delete().eq('id', listId)
+    if (error) throw new Error(error.message)
+    return { success: true }
+  })
+}
+
+// ─── MEMBERS ──────────────────────────────────────────────────────────
+
 export async function inviteMember(orgId: string, email: string, role: string) {
   return withPermission(async () => {
     const userId = getUserId()
-    const parsed = InviteMemberSchema.parse({ email, role })
+
+    const validRoles = ['admin', 'member', 'viewer']
+    if (!validRoles.includes(role)) throw new Error('Role inválido')
+    if (!email || !email.includes('@')) throw new Error('Email inválido')
 
     await requireOrgRole(userId, orgId, 'admin')
 
     const db = createServiceClient()
 
-    // Busca perfil pelo email
+    // Verifica se já é membro pelo perfil existente
     const { data: profile } = await db
       .from('profiles')
       .select('id')
-      .eq('email', parsed.email)
+      .eq('email', email.toLowerCase())
       .single()
 
-    if (!profile) {
-      throw new Error('Usuário não encontrado. O usuário precisa ter feito login pelo menos uma vez.')
+    if (profile) {
+      const { data: existingMember } = await db
+        .from('organization_members')
+        .select('id')
+        .eq('organization_id', orgId)
+        .eq('user_id', profile.id)
+        .single()
+
+      if (existingMember) throw new Error('Este usuário já é membro da organização.')
+
+      const { error } = await db.from('organization_members').insert({
+        organization_id: orgId,
+        user_id: profile.id,
+        role,
+      })
+      if (error) throw new Error(error.message)
+      return { success: true, joined: true }
     }
 
-    // Verifica se já é membro
+    // Usuário ainda não tem perfil → cria convite pendente
+    const { data: existingInvite } = await db
+      .from('invitations')
+      .select('id')
+      .eq('organization_id', orgId)
+      .eq('email', email.toLowerCase())
+      .single()
+
+    if (existingInvite) {
+      throw new Error('Já existe um convite pendente para este email.')
+    }
+
+    const { error } = await db.from('invitations').insert({
+      organization_id: orgId,
+      email: email.toLowerCase(),
+      role,
+      invited_by: userId,
+    })
+    if (error) throw new Error(error.message)
+
+    return {
+      success: true,
+      joined: false,
+      message: 'Convite criado. O usuário será adicionado automaticamente ao fazer login.',
+    }
+  })
+}
+
+// Chamada no layout após login para processar convites pendentes
+export async function processInvitations(userEmail: string, userId: string) {
+  if (!userEmail || !userId) return
+
+  const db = createServiceClient()
+
+  const { data: pendingInvites } = await db
+    .from('invitations')
+    .select('id, organization_id, role')
+    .eq('email', userEmail.toLowerCase())
+
+  if (!pendingInvites || pendingInvites.length === 0) return
+
+  for (const invite of pendingInvites) {
+    // Garante perfil existe
+    await db
+      .from('profiles')
+      .upsert({ id: userId, email: userEmail.toLowerCase() }, { onConflict: 'id' })
+
+    // Evita duplicata
     const { data: existing } = await db
       .from('organization_members')
       .select('id')
-      .eq('organization_id', orgId)
-      .eq('user_id', profile.id)
+      .eq('organization_id', invite.organization_id)
+      .eq('user_id', userId)
       .single()
 
-    if (existing) {
-      throw new Error('Este usuário já é membro da organização.')
+    if (!existing) {
+      await db.from('organization_members').insert({
+        organization_id: invite.organization_id,
+        user_id: userId,
+        role: invite.role,
+      })
     }
 
-    const { error } = await db
-      .from('organization_members')
-      .insert({
-        organization_id: orgId,
-        user_id: profile.id,
-        role: parsed.role,
-      })
-
-    if (error) throw new Error(error.message)
-    return { success: true }
-  })
+    await db.from('invitations').delete().eq('id', invite.id)
+  }
 }

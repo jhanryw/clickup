@@ -3,10 +3,11 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createServiceClient, withUserContext } from '@/lib/supabase/server'
 import { SignOutButton } from '@/components/auth/sign-out-button'
-import { LayoutDashboard, Settings, Users } from 'lucide-react'
+import { LayoutDashboard, Settings, Users, FileText } from 'lucide-react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { HierarchySection } from '@/components/sidebar/hierarchy-section'
 import { WorkspaceProvider } from '@/contexts/workspace-context'
+import { processInvitations } from '@/app/actions/hierarchy'
 
 interface SpaceHierarchyNode {
     id: string
@@ -64,6 +65,11 @@ export default async function OrgLayout({
 
     if (!member) redirect('/')
 
+    // Processa convites pendentes para o email deste usuário
+    if (userEmail) {
+        await processInvitations(userEmail, userId).catch(() => {/* silencia erros de invite */})
+    }
+
     const hierarchy: SpaceHierarchyNode[] = await withUserContext(userId, async (ctxDb) => {
         const { data, error } = await ctxDb.rpc('get_space_hierarchy', {
             p_org_id: org.id,
@@ -114,6 +120,10 @@ export default async function OrgLayout({
                         <Link href={`/org/${params.slug}/members`} className="flex items-center gap-3 rounded-md px-3 py-2 text-[13px] text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-100 transition-colors">
                             <Users className="h-4 w-4" />
                             <span>Membros</span>
+                        </Link>
+                        <Link href={`/org/${params.slug}/docs`} className="flex items-center gap-3 rounded-md px-3 py-2 text-[13px] text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-100 transition-colors">
+                            <FileText className="h-4 w-4" />
+                            <span>Documentos</span>
                         </Link>
                         {(member.role === 'admin' || member.role === 'owner') && (
                             <Link href={`/org/${params.slug}/settings`} className="flex items-center gap-3 rounded-md px-3 py-2 text-[13px] text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-100 transition-colors">
