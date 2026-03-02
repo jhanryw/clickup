@@ -1,15 +1,16 @@
 /**
- * Callback route do LogTo — POST /app/callback
+ * Callback route do LogTo — GET /callback
  *
  * Após autenticação bem-sucedida no LogTo, o usuário é redirecionado aqui.
  * Este handler:
  *   1. Valida a resposta do LogTo
  *   2. Sincroniza o perfil no Supabase
- *   3. Redireciona para o dashboard
+ *   3. Redireciona para o dashboard (ou redirect pós-login, ex: aceitar convite)
  */
 
 import { handleSignIn } from '@logto/next/server-actions'
 import { redirect } from 'next/navigation'
+import { cookies } from 'next/headers'
 import type { NextRequest } from 'next/server'
 import { logtoConfig } from '@/app/logto'
 import { upsertUserProfile } from '@/lib/supabase/server'
@@ -41,6 +42,13 @@ export async function GET(request: NextRequest) {
   }
 
   if (success) {
+    // Verifica se há um redirect pendente (ex: aceitar convite por token)
+    const cookieStore = cookies()
+    const postLoginRedirect = cookieStore.get('post_login_redirect')?.value
+    if (postLoginRedirect) {
+      cookieStore.delete('post_login_redirect')
+      redirect(postLoginRedirect)
+    }
     redirect('/')
   } else {
     redirect('/login')

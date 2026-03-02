@@ -4,6 +4,7 @@ import { headers } from 'next/headers'
 import { z } from 'zod'
 import { CreateOrganizationSchema } from '@/lib/validators'
 import { createServiceClient } from '@/lib/supabase/server'
+import { withPermission, requireOrgRole } from '@/lib/permissions'
 
 function getUserId(): string {
   const userId = headers().get('x-user-id')
@@ -98,4 +99,37 @@ export async function createOrganization(input: z.infer<typeof CreateOrganizatio
     console.error('[createOrganization] Exceção:', err)
     return { error: err.message || 'Erro interno' }
   }
+}
+
+/** Renomeia a organização (admin ou owner) */
+export async function renameOrganization(orgId: string, name: string) {
+  return withPermission(async () => {
+    const userId = getUserId()
+    if (!name?.trim() || name.trim().length < 2) throw new Error('Nome deve ter ao menos 2 caracteres.')
+
+    await requireOrgRole(userId, orgId, 'admin')
+
+    const db = createServiceClient()
+    const { error } = await db
+      .from('organizations')
+      .update({ name: name.trim() })
+      .eq('id', orgId)
+
+    if (error) throw new Error(error.message)
+    return { success: true }
+  })
+}
+
+/** Apaga a organização e todos os dados (owner only) */
+export async function deleteOrganization(orgId: string) {
+  return withPermission(async () => {
+    const userId = getUserId()
+
+    await requireOrgRole(userId, orgId, 'owner')
+
+    const db = createServiceClient()
+    const { error } = await db.from('organizations').delete().eq('id', orgId)
+    if (error) throw new Error(error.message)
+    return { success: true }
+  })
 }

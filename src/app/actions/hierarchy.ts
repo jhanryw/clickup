@@ -306,12 +306,12 @@ export async function inviteMember(orgId: string, email: string, role: string) {
       throw new Error('Já existe um convite pendente para este email.')
     }
 
-    const { error } = await db.from('invitations').insert({
+    const { data: invite, error } = await db.from('invitations').insert({
       organization_id: orgId,
       email: email.toLowerCase(),
       role,
       invited_by: userId,
-    })
+    }).select('token').single()
     if (error) throw new Error(error.message)
 
     // Email de convite via Listmonk (se configurado)
@@ -320,16 +320,20 @@ export async function inviteMember(orgId: string, email: string, role: string) {
       try {
         const { data: orgData } = await db
           .from('organizations')
-          .select('name')
+          .select('name, slug')
           .eq('id', orgId)
           .single()
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'http://localhost:3000'
+        const acceptUrl = `${appUrl}/invite/${invite?.token}`
         await sendTransactionalEmail({
           subscriberEmail: email.toLowerCase(),
           subscriberName: email.split('@')[0],
           templateId: inviteTemplateId,
           data: {
             org_name: orgData?.name || 'Qarvon',
+            org_slug: orgData?.slug || '',
             role,
+            accept_url: acceptUrl,
           },
         })
       } catch (emailErr) {
@@ -355,16 +359,15 @@ export async function processInvitations(userEmail: string, userId: string) {
     .from('invitations')
     .select('id, organization_id, role')
     .eq('email', userEmail.toLowerCase())
+    .eq('status', 'pending')
 
   if (!pendingInvites || pendingInvites.length === 0) return
 
   for (const invite of pendingInvites) {
-    // Garante perfil existe
     await db
       .from('profiles')
       .upsert({ id: userId, email: userEmail.toLowerCase() }, { onConflict: 'id' })
 
-    // Evita duplicata
     const { data: existing } = await db
       .from('organization_members')
       .select('id')
@@ -380,6 +383,84 @@ export async function processInvitations(userEmail: string, userId: string) {
       })
     }
 
-    await db.from('invitations').delete().eq('id', invite.id)
+    await db.from('invitations').update({ status: 'accepted' }).eq('id', invite.id)
   }
+}
+
+/** Processa um convite pelo token (link de aceitação no email) */
+export async function processInviteByToken(token: string, userId: string, userEmail: string) {
+  if (!token || !userId) return { error: 'Dados inválidos' }
+
+  const db = createServiceClient()
+
+  const { data: invite } = await db
+    .from('invitations')
+    .select('id, organization_id, role, email, status')
+    .eq('token', token)
+    .single()
+
+  if (!invite) return { error: 'Convite não encontrado ou expirado.' }
+  if (invite.status !== 'pending') return { error: 'Este convite já foi utilizado ou cancelado.' }
+  if (invite.email.toLowerCase() !== userEmail.toLowerCase()) {
+    return { error: 'Este convite foi enviado para um email diferente do seu.' }
+  }
+
+  // Garante perfil
+  await db
+    .from('profiles')
+    .upsert({ id: userId, email: userEmail.toLowerCase() }, { onConflict: 'id' })
+
+  // Verifica se já é membro
+  const { data: existing } = await db
+    .from('organization_members')
+    .select('id')
+    .eq('organization_id', invite.organization_id)
+    .eq('user_id', userId)
+    .single()
+
+  if (!existing) {
+    const { error: memberErr } = await db.from('organization_members').insert({
+      organization_id: invite.organization_id,
+      user_id: userId,
+      role: invite.role,
+    })
+    if (memberErr) return { error: memberErr.message }
+  }
+
+  await db.from('invitations').update({ status: 'accepted' }).eq('id', invite.id)
+
+  // Retorna o slug da org para redirecionar
+  const { data: org } = await db
+    .from('organizations')
+    .select('slug')
+    .eq('id', invite.organization_id)
+    .single()
+
+  return { success: true, orgSlug: org?.slug }
+}
+
+/** Cancela um convite pendente (admin/owner da org) */
+export async function cancelInvitation(invitationId: string) {
+  return withPermission(async () => {
+    const userId = getUserId()
+
+    const db = createServiceClient()
+    const { data: invite } = await db
+      .from('invitations')
+      .select('organization_id')
+      .eq('id', invitationId)
+      .single()
+
+    if (!invite) throw new Error('Convite não encontrado.')
+
+    await requireOrgRole(userId, invite.organization_id, 'admin')
+
+    const { error } = await db
+      .from('invitations')
+      .update({ status: 'cancelled' })
+      .eq('id', invitationId)
+
+    if (error) throw new Error(error.message)
+    return { success: true }
+  })
 }

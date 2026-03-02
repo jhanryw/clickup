@@ -2,12 +2,13 @@ import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createServiceClient, withUserContext } from '@/lib/supabase/server'
-import { SignOutButton } from '@/components/auth/sign-out-button'
 import { LayoutDashboard, Settings, Users, FileText } from 'lucide-react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { HierarchySection } from '@/components/sidebar/hierarchy-section'
 import { WorkspaceProvider } from '@/contexts/workspace-context'
 import { processInvitations } from '@/app/actions/hierarchy'
+import { OrgHeader } from '@/components/sidebar/org-header'
+import { UserFooter } from '@/components/sidebar/user-footer'
 
 interface SpaceHierarchyNode {
     id: string
@@ -101,15 +102,12 @@ export default async function OrgLayout({
                 <aside className="flex w-[260px] flex-col border-r border-zinc-800/80 bg-[#1a1a22]">
 
                     {/* Org Header */}
-                    <div className="flex items-center gap-3 border-b border-zinc-800/60 px-4 py-3.5 hover:bg-zinc-800/30 cursor-pointer transition-colors">
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 text-xs font-bold text-white shadow-lg shadow-indigo-500/20">
-                            {org.name.substring(0, 1).toUpperCase()}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-semibold text-zinc-100">{org.name}</p>
-                            <p className="text-[11px] text-zinc-500 capitalize">{member.role}</p>
-                        </div>
-                    </div>
+                    <OrgHeader
+                        orgId={org.id}
+                        orgName={org.name}
+                        orgSlug={params.slug}
+                        userRole={member.role}
+                    />
 
                     {/* Nav Links */}
                     <div className="px-2 pt-3 pb-2 space-y-0.5 border-b border-zinc-800/60">
@@ -143,20 +141,7 @@ export default async function OrgLayout({
                     </ScrollArea>
 
                     {/* User Footer */}
-                    <div className="border-t border-zinc-800/60 px-3 py-3">
-                        <div className="flex items-center gap-2.5">
-                            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-zinc-700 to-zinc-800 text-[10px] font-bold text-zinc-300 ring-1 ring-zinc-700">
-                                {initials}
-                            </div>
-                            <p className="text-[13px] font-medium text-zinc-300 truncate flex-1">{displayName}</p>
-                        </div>
-                        <div className="mt-2.5">
-                            <SignOutButton
-                                variant="button"
-                                className="w-full justify-center text-xs h-8 border-zinc-800 hover:bg-zinc-800 text-zinc-500 hover:text-zinc-300 transition-colors"
-                            />
-                        </div>
-                    </div>
+                    <UserFooter displayName={displayName} initials={initials} />
                 </aside>
 
                 {/* Main Content */}

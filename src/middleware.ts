@@ -24,6 +24,7 @@ const PUBLIC_ROUTES = [
   '/login',
   '/callback',         // Callback do LogTo
   '/f/',               // Formulários públicos
+  '/invite/',          // Aceite de convites por token
   '/api/forms',        // API pública de submissão
   '/api/webhooks/incoming', // Webhook de entrada
 ]

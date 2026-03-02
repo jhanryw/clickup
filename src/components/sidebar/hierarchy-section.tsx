@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   ChevronRight, ChevronDown, Folder as FolderIcon, LayoutList,
-  MoreHorizontal, Pencil, Trash2, Check, X,
+  MoreHorizontal, Pencil, Trash2, Check, X, FileText,
 } from 'lucide-react'
 import { CreateSpaceDialog } from '@/components/dialogs/create-space-dialog'
 import { CreateFolderDialog } from '@/components/dialogs/create-folder-dialog'
@@ -15,6 +15,7 @@ import {
   renameFolder, deleteFolder,
   renameList, deleteList,
 } from '@/app/actions/hierarchy'
+import { createDocument } from '@/app/actions/documents'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -110,6 +111,19 @@ export function HierarchySection({ hierarchy, orgSlug, organizationId, currentLi
     })
   }
 
+  function handleCreateDoc(folderId: string) {
+    startTransition(async () => {
+      const result = await createDocument({
+        organization_id: organizationId,
+        folder_id: folderId,
+        title: 'Sem título',
+      })
+      if (result.data) {
+        router.push(`/org/${orgSlug}/docs/${result.data.id}`)
+      }
+    })
+  }
+
   return (
     <div className="flex flex-col">
       <div className="px-3 pt-4 pb-2 flex items-center justify-between">
@@ -200,7 +214,11 @@ export function HierarchySection({ hierarchy, orgSlug, organizationId, currentLi
                                       <MoreHorizontal className="h-3.5 w-3.5" />
                                     </button>
                                   </DropdownMenuTrigger>
-                                  <DropdownMenuContent className="bg-zinc-900 border-zinc-800 text-zinc-200 min-w-[140px]" align="end">
+                                  <DropdownMenuContent className="bg-zinc-900 border-zinc-800 text-zinc-200 min-w-[160px]" align="end">
+                                    <DropdownMenuItem onClick={() => handleCreateDoc(folder.id)} className="gap-2 cursor-pointer hover:bg-zinc-800 focus:bg-zinc-800">
+                                      <FileText className="h-3.5 w-3.5" /> Novo Documento
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator className="bg-zinc-800" />
                                     <DropdownMenuItem onClick={() => setRenamingId(folder.id)} className="gap-2 cursor-pointer hover:bg-zinc-800 focus:bg-zinc-800">
                                       <Pencil className="h-3.5 w-3.5" /> Renomear
                                     </DropdownMenuItem>

@@ -13,13 +13,32 @@ import { Plus } from 'lucide-react'
 interface CreateTaskDialogProps {
   listId: string
   statuses: { id: string; name: string; color: string }[]
+  // Modo controlado (ex: Kanban + button)
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+  initialStatusId?: string
 }
 
-export function CreateTaskDialog({ listId, statuses }: CreateTaskDialogProps) {
-  const [open, setOpen] = useState(false)
+export function CreateTaskDialog({
+  listId,
+  statuses,
+  open: controlledOpen,
+  onOpenChange: controlledOnOpenChange,
+  initialStatusId,
+}: CreateTaskDialogProps) {
+  const [internalOpen, setInternalOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
+
+  // Suporte a modo controlado e não-controlado
+  const isControlled = controlledOpen !== undefined
+  const open = isControlled ? controlledOpen : internalOpen
+  const setOpen = isControlled
+    ? (v: boolean) => controlledOnOpenChange?.(v)
+    : setInternalOpen
+
+  const defaultStatusId = initialStatusId || statuses[0]?.id
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -53,13 +72,17 @@ export function CreateTaskDialog({ listId, statuses }: CreateTaskDialogProps) {
     }
   }
 
+  const trigger = !isControlled ? (
+    <DialogTrigger asChild>
+      <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white">
+        <Plus className="h-4 w-4 mr-2" /> Nova Tarefa
+      </Button>
+    </DialogTrigger>
+  ) : null
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white">
-          <Plus className="h-4 w-4 mr-2" /> Nova Tarefa
-        </Button>
-      </DialogTrigger>
+      {trigger}
       <DialogContent className="bg-zinc-900 border-zinc-800 text-zinc-100 sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="text-lg">Nova Tarefa</DialogTitle>
@@ -73,6 +96,7 @@ export function CreateTaskDialog({ listId, statuses }: CreateTaskDialogProps) {
               id="title"
               name="title"
               required
+              autoFocus
               placeholder="Ex: Criar landing page"
               className="bg-zinc-950 border-zinc-700 text-zinc-200 placeholder:text-zinc-600"
             />
@@ -94,7 +118,7 @@ export function CreateTaskDialog({ listId, statuses }: CreateTaskDialogProps) {
             {/* Status */}
             <div className="space-y-2">
               <Label className="text-zinc-300">Status</Label>
-              <Select name="status_id" defaultValue={statuses[0]?.id}>
+              <Select name="status_id" defaultValue={defaultStatusId}>
                 <SelectTrigger className="bg-zinc-950 border-zinc-700 text-zinc-200">
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>

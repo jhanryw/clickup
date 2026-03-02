@@ -72,7 +72,7 @@ export function TaskViews({ tasks, statuses, listId, members = [] }: TaskViewsPr
           </TabsContent>
 
           <TabsContent value="board" className="h-full m-0">
-            <BoardView tasks={tasks} statuses={statuses} onTaskClick={setSelectedTask} />
+            <BoardView tasks={tasks} statuses={statuses} listId={listId} onTaskClick={setSelectedTask} />
           </TabsContent>
 
           <TabsContent value="calendar" className="h-full m-0">
