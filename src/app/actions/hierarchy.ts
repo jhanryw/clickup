@@ -5,8 +5,6 @@ import { z } from 'zod'
 import { CreateSpaceSchema, CreateFolderSchema, CreateListSchema } from '@/lib/validators'
 import { withPermission, requireOrgRole, requireSpaceAccess } from '@/lib/permissions'
 import { createServiceClient } from '@/lib/supabase/server'
-import { sendTransactionalEmail } from './listmonk'
-
 function getUserId(): string {
   const userId = headers().get('x-user-id')
   if (!userId) throw new Error('Não autenticado')
@@ -300,6 +298,7 @@ export async function inviteMember(orgId: string, email: string, role: string) {
       .select('id')
       .eq('organization_id', orgId)
       .eq('email', email.toLowerCase())
+      .eq('status', 'pending')
       .single()
 
     if (existingInvite) {
@@ -314,37 +313,11 @@ export async function inviteMember(orgId: string, email: string, role: string) {
     }).select('token').single()
     if (error) throw new Error(error.message)
 
-    // Email de convite via Listmonk (se configurado)
-    const inviteTemplateId = parseInt(process.env.LISTMONK_INVITE_TEMPLATE_ID || '0')
-    if (inviteTemplateId > 0) {
-      try {
-        const { data: orgData } = await db
-          .from('organizations')
-          .select('name, slug')
-          .eq('id', orgId)
-          .single()
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'http://localhost:3000'
-        const acceptUrl = `${appUrl}/invite/${invite?.token}`
-        await sendTransactionalEmail({
-          subscriberEmail: email.toLowerCase(),
-          subscriberName: email.split('@')[0],
-          templateId: inviteTemplateId,
-          data: {
-            org_name: orgData?.name || 'Qarvon',
-            org_slug: orgData?.slug || '',
-            role,
-            accept_url: acceptUrl,
-          },
-        })
-      } catch (emailErr) {
-        console.error('[Listmonk] Falha ao enviar email de convite', emailErr)
-      }
-    }
-
     return {
       success: true,
       joined: false,
-      message: 'Convite criado. O usuário será adicionado automaticamente ao fazer login.',
+      token: invite?.token as string,
+      message: 'Convite criado. Copie o link para enviar ao convidado.',
     }
   })
 }
@@ -439,8 +412,8 @@ export async function processInviteByToken(token: string, userId: string, userEm
   return { success: true, orgSlug: org?.slug }
 }
 
-/** Cancela um convite pendente (admin/owner da org) */
-export async function cancelInvitation(invitationId: string) {
+/** Exclui um convite pendente permanentemente (admin/owner da org) */
+export async function deleteInvitation(invitationId: string) {
   return withPermission(async () => {
     const userId = getUserId()
 
@@ -457,10 +430,13 @@ export async function cancelInvitation(invitationId: string) {
 
     const { error } = await db
       .from('invitations')
-      .update({ status: 'cancelled' })
+      .delete()
       .eq('id', invitationId)
 
     if (error) throw new Error(error.message)
     return { success: true }
   })
 }
+
+/** @deprecated Use deleteInvitation */
+export const cancelInvitation = deleteInvitation

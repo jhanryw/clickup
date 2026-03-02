@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { inviteMember, cancelInvitation } from '@/app/actions/hierarchy'
+import { inviteMember, deleteInvitation } from '@/app/actions/hierarchy'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog'
-import { UserPlus, Shield, ShieldCheck, Eye, Crown, Mail, Clock, X, Users } from 'lucide-react'
+import { UserPlus, Shield, ShieldCheck, Eye, Crown, Mail, Clock, X, Users, Copy, Check, Trash2, Link2 } from 'lucide-react'
 
 interface Member {
   userId: string
@@ -50,8 +50,10 @@ export function MembersClient({ members, orgId, currentUserRole, pendingInvites 
   const [inviteLoading, setInviteLoading] = useState(false)
   const [inviteError, setInviteError] = useState<string | null>(null)
   const [inviteSuccess, setInviteSuccess] = useState(false)
+  const [newInviteToken, setNewInviteToken] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<Tab>('members')
-  const [cancellingId, setCancellingId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [copiedId, setCopiedId] = useState<string | null>(null)
   const [, startTransition] = useTransition()
   const router = useRouter()
 
@@ -73,8 +75,11 @@ export function MembersClient({ members, orgId, currentUserRole, pendingInvites 
         setInviteError(result.error as string)
       } else {
         setInviteSuccess(true)
+        // Guarda o token para exibir o link imediatamente
+        if (result.data && 'token' in result.data) {
+          setNewInviteToken(result.data.token as string)
+        }
         router.refresh()
-        setTimeout(() => { setInviteOpen(false); setInviteSuccess(false) }, 1500)
       }
     } catch (err: any) {
       setInviteError(err.message || 'Erro ao convidar membro')
@@ -83,16 +88,28 @@ export function MembersClient({ members, orgId, currentUserRole, pendingInvites 
     }
   }
 
-  function handleCancelInvite(inviteId: string) {
-    setCancellingId(inviteId)
+  function handleDeleteInvite(inviteId: string) {
+    setDeletingId(inviteId)
     startTransition(async () => {
-      const result = await cancelInvitation(inviteId)
+      const result = await deleteInvitation(inviteId)
       if ('error' in result && result.error) {
         alert(result.error as string)
       } else {
         router.refresh()
       }
-      setCancellingId(null)
+      setDeletingId(null)
+    })
+  }
+
+  function getInviteLink(token: string) {
+    const origin = typeof window !== 'undefined' ? window.location.origin : ''
+    return `${origin}/accept-invite?token=${token}`
+  }
+
+  function handleCopyLink(inviteId: string, token: string) {
+    navigator.clipboard.writeText(getInviteLink(token)).then(() => {
+      setCopiedId(inviteId)
+      setTimeout(() => setCopiedId(null), 2000)
     })
   }
 
@@ -173,18 +190,44 @@ export function MembersClient({ members, orgId, currentUserRole, pendingInvites 
                 {inviteError && (
                   <p className="text-sm text-red-400 bg-red-950/30 px-3 py-2 rounded">{inviteError}</p>
                 )}
-                {inviteSuccess && (
+                {inviteSuccess && newInviteToken && (
+                  <div className="space-y-2">
+                    <p className="text-sm text-green-400 bg-green-950/30 px-3 py-2 rounded">
+                      ✓ Convite criado! Copie o link abaixo e envie ao convidado.
+                    </p>
+                    <div className="flex items-center gap-2 rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2">
+                      <p className="flex-1 text-xs text-zinc-400 truncate font-mono">
+                        {getInviteLink(newInviteToken)}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyLink('new', newInviteToken)}
+                        className="shrink-0 rounded p-1 text-zinc-400 hover:text-indigo-300 hover:bg-zinc-800"
+                      >
+                        {copiedId === 'new' ? <Check className="h-4 w-4 text-green-400" /> : <Copy className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {inviteSuccess && !newInviteToken && (
                   <p className="text-sm text-green-400 bg-green-950/30 px-3 py-2 rounded">
-                    Convite enviado com sucesso!
+                    ✓ Usuário adicionado diretamente (já tinha perfil)!
                   </p>
                 )}
                 <div className="flex justify-end gap-3 pt-2">
-                  <Button type="button" variant="ghost" onClick={() => setInviteOpen(false)} className="text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800">
-                    Cancelar
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => { setInviteOpen(false); setInviteSuccess(false); setNewInviteToken(null) }}
+                    className="text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800"
+                  >
+                    {inviteSuccess ? 'Fechar' : 'Cancelar'}
                   </Button>
-                  <Button type="submit" disabled={inviteLoading} className="bg-indigo-600 hover:bg-indigo-700 text-white">
-                    {inviteLoading ? 'Convidando...' : 'Convidar'}
-                  </Button>
+                  {!inviteSuccess && (
+                    <Button type="submit" disabled={inviteLoading} className="bg-indigo-600 hover:bg-indigo-700 text-white">
+                      {inviteLoading ? 'Criando...' : 'Criar Convite'}
+                    </Button>
+                  )}
                 </div>
               </form>
             </DialogContent>
@@ -258,20 +301,21 @@ export function MembersClient({ members, orgId, currentUserRole, pendingInvites 
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-[1fr_auto_auto_auto] gap-4 px-5 py-3 border-b border-zinc-800 text-xs font-medium text-zinc-500 uppercase tracking-wider">
+              <div className="grid grid-cols-[1fr_auto_auto_auto] gap-3 px-5 py-3 border-b border-zinc-800 text-xs font-medium text-zinc-500 uppercase tracking-wider">
                 <span>Email</span>
-                <span className="w-28 text-center">Cargo</span>
-                <span className="w-28 text-right">Enviado em</span>
-                {canInvite && <span className="w-16" />}
+                <span className="w-24 text-center">Cargo</span>
+                <span className="w-24 text-right">Enviado em</span>
+                {canInvite && <span className="w-24" />}
               </div>
 
               {pendingInvites.map((invite) => {
                 const roleConfig = ROLE_CONFIG[invite.role] || ROLE_CONFIG.member
                 const RoleIcon = roleConfig.icon
+                const isCopied = copiedId === invite.id
                 return (
                   <div
                     key={invite.id}
-                    className="grid grid-cols-[1fr_auto_auto_auto] gap-4 items-center px-5 py-3 border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-colors last:border-b-0"
+                    className="grid grid-cols-[1fr_auto_auto_auto] gap-3 items-center px-5 py-3 border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-colors last:border-b-0"
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-zinc-800/80 border border-dashed border-zinc-700">
@@ -283,29 +327,45 @@ export function MembersClient({ members, orgId, currentUserRole, pendingInvites 
                       </div>
                     </div>
 
-                    <div className="w-28 flex justify-center">
-                      <Badge variant="outline" className={`${roleConfig.color} text-xs font-medium px-2.5 py-0.5`}>
+                    <div className="w-24 flex justify-center">
+                      <Badge variant="outline" className={`${roleConfig.color} text-xs font-medium px-2 py-0.5`}>
                         <RoleIcon className="h-3 w-3 mr-1" />
                         {roleConfig.label}
                       </Badge>
                     </div>
 
-                    <div className="w-28 text-right">
+                    <div className="w-24 text-right">
                       <span className="text-xs text-zinc-500">
                         {new Date(invite.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
                       </span>
                     </div>
 
                     {canInvite && (
-                      <div className="w-16 flex justify-end">
+                      <div className="w-24 flex items-center justify-end gap-1">
+                        {/* Copiar Link */}
                         <button
-                          onClick={() => handleCancelInvite(invite.id)}
-                          disabled={cancellingId === invite.id}
-                          className="flex items-center gap-1 rounded px-2 py-1 text-xs text-zinc-500 hover:text-red-400 hover:bg-red-950/30 transition-colors disabled:opacity-40"
-                          title="Cancelar convite"
+                          onClick={() => handleCopyLink(invite.id, invite.token)}
+                          className={`flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors ${
+                            isCopied
+                              ? 'text-green-400 bg-green-950/30'
+                              : 'text-zinc-500 hover:text-indigo-300 hover:bg-indigo-950/30'
+                          }`}
+                          title="Copiar link de convite"
                         >
-                          <X className="h-3.5 w-3.5" />
-                          {cancellingId === invite.id ? '...' : 'Cancelar'}
+                          {isCopied ? <Check className="h-3.5 w-3.5" /> : <Link2 className="h-3.5 w-3.5" />}
+                          {isCopied ? 'Copiado' : 'Copiar'}
+                        </button>
+                        {/* Excluir */}
+                        <button
+                          onClick={() => handleDeleteInvite(invite.id)}
+                          disabled={deletingId === invite.id}
+                          className="flex items-center justify-center rounded p-1.5 text-zinc-600 hover:text-red-400 hover:bg-red-950/30 transition-colors disabled:opacity-40"
+                          title="Excluir convite"
+                        >
+                          {deletingId === invite.id
+                            ? <span className="text-[10px]">...</span>
+                            : <Trash2 className="h-3.5 w-3.5" />
+                          }
                         </button>
                       </div>
                     )}
