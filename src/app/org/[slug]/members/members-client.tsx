@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { inviteMember, deleteInvitation } from '@/app/actions/hierarchy'
+import { inviteMember, deleteInvitation, resendInvitationEmail } from '@/app/actions/hierarchy'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog'
-import { UserPlus, Shield, ShieldCheck, Eye, Crown, Mail, Clock, X, Users, Copy, Check, Trash2, Link2 } from 'lucide-react'
+import { UserPlus, Shield, ShieldCheck, Eye, Crown, Mail, Clock, X, Users, Copy, Check, Trash2, Link2, Send } from 'lucide-react'
 
 interface Member {
   userId: string
@@ -53,6 +53,8 @@ export function MembersClient({ members, orgId, currentUserRole, pendingInvites 
   const [newInviteToken, setNewInviteToken] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<Tab>('members')
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [resendingId, setResendingId] = useState<string | null>(null)
+  const [resentId, setResentId] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [, startTransition] = useTransition()
   const router = useRouter()
@@ -110,6 +112,20 @@ export function MembersClient({ members, orgId, currentUserRole, pendingInvites 
     navigator.clipboard.writeText(getInviteLink(token)).then(() => {
       setCopiedId(inviteId)
       setTimeout(() => setCopiedId(null), 2000)
+    })
+  }
+
+  function handleResendEmail(inviteId: string) {
+    setResendingId(inviteId)
+    startTransition(async () => {
+      const result = await resendInvitationEmail(inviteId)
+      if ('error' in result && result.error) {
+        alert(result.error as string)
+      } else {
+        setResentId(inviteId)
+        setTimeout(() => setResentId(null), 2500)
+      }
+      setResendingId(null)
     })
   }
 
@@ -341,7 +357,26 @@ export function MembersClient({ members, orgId, currentUserRole, pendingInvites 
                     </div>
 
                     {canInvite && (
-                      <div className="w-24 flex items-center justify-end gap-1">
+                      <div className="flex items-center justify-end gap-1 shrink-0">
+                        {/* Reenviar email */}
+                        <button
+                          onClick={() => handleResendEmail(invite.id)}
+                          disabled={resendingId === invite.id}
+                          className={`flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors disabled:opacity-40 ${
+                            resentId === invite.id
+                              ? 'text-green-400 bg-green-950/30'
+                              : 'text-zinc-500 hover:text-blue-300 hover:bg-blue-950/30'
+                          }`}
+                          title="Reenviar email de convite"
+                        >
+                          {resendingId === invite.id
+                            ? <span className="text-[10px]">...</span>
+                            : resentId === invite.id
+                              ? <Check className="h-3.5 w-3.5" />
+                              : <Send className="h-3.5 w-3.5" />
+                          }
+                          {resentId === invite.id ? 'Enviado' : 'Reenviar'}
+                        </button>
                         {/* Copiar Link */}
                         <button
                           onClick={() => handleCopyLink(invite.id, invite.token)}

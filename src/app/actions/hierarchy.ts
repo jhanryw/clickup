@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { CreateSpaceSchema, CreateFolderSchema, CreateListSchema } from '@/lib/validators'
 import { withPermission, requireOrgRole, requireSpaceAccess } from '@/lib/permissions'
 import { createServiceClient } from '@/lib/supabase/server'
+import { sendInviteEmail } from './resend'
 function getUserId(): string {
   const userId = headers().get('x-user-id')
   if (!userId) throw new Error('Não autenticado')
@@ -313,11 +314,28 @@ export async function inviteMember(orgId: string, email: string, role: string) {
     }).select('token').single()
     if (error) throw new Error(error.message)
 
+    // Envia email de convite via Resend (não-bloqueante: falha silenciosa)
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'http://localhost:3000'
+    const inviteLink = `${appUrl}/accept-invite?token=${invite?.token}`
+
+    const { data: orgData } = await db
+      .from('organizations')
+      .select('name')
+      .eq('id', orgId)
+      .single()
+
+    sendInviteEmail({
+      to: email.toLowerCase(),
+      inviteLink,
+      orgName: orgData?.name || 'Qarvon',
+      role,
+    }).catch(err => console.error('[inviteMember] Resend falhou:', err))
+
     return {
       success: true,
       joined: false,
       token: invite?.token as string,
-      message: 'Convite criado. Copie o link para enviar ao convidado.',
+      message: 'Convite criado e email enviado.',
     }
   })
 }
@@ -410,6 +428,45 @@ export async function processInviteByToken(token: string, userId: string, userEm
     .single()
 
   return { success: true, orgSlug: org?.slug }
+}
+
+/** Reenvia o email de convite pelo Resend (admin/owner da org) */
+export async function resendInvitationEmail(invitationId: string) {
+  return withPermission(async () => {
+    const userId = getUserId()
+
+    const db = createServiceClient()
+    const { data: invite } = await db
+      .from('invitations')
+      .select('email, role, organization_id, token, status')
+      .eq('id', invitationId)
+      .single()
+
+    if (!invite) throw new Error('Convite não encontrado.')
+    if (invite.status !== 'pending') throw new Error('Este convite já foi aceito ou excluído.')
+
+    await requireOrgRole(userId, invite.organization_id, 'admin')
+
+    const { data: org } = await db
+      .from('organizations')
+      .select('name')
+      .eq('id', invite.organization_id)
+      .single()
+
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'http://localhost:3000'
+    const inviteLink = `${appUrl}/accept-invite?token=${invite.token}`
+
+    const result = await sendInviteEmail({
+      to: invite.email,
+      inviteLink,
+      orgName: org?.name || 'Qarvon',
+      role: invite.role,
+    })
+
+    if (!result.success) throw new Error(result.error || 'Falha ao enviar email')
+
+    return { success: true }
+  })
 }
 
 /** Exclui um convite pendente permanentemente (admin/owner da org) */
