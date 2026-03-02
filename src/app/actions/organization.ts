@@ -13,7 +13,7 @@ function getUserId(): string {
 
 /**
  * Cria uma nova organização e define o usuário como owner.
- * Também cria os custom_statuses padrão e vincula ao banco.
+ * Também garante que o perfil do usuário existe antes de criar a membership.
  */
 export async function createOrganization(input: z.infer<typeof CreateOrganizationSchema>) {
   try {
@@ -32,6 +32,32 @@ export async function createOrganization(input: z.infer<typeof CreateOrganizatio
       return { error: 'Esse slug já está em uso. Escolha outro.' }
     }
 
+    // Garante que o perfil do usuário existe
+    const { data: profile, error: profileErr } = await db
+      .from('profiles')
+      .select('id')
+      .eq('id', userId)
+      .single()
+
+    if (!profile) {
+      console.log('[createOrganization] Criando perfil para userId:', userId)
+      const { error: upsertErr } = await db
+        .from('profiles')
+        .upsert(
+          {
+            id: userId,
+            email: `user_${userId}@system.local`,
+            full_name: 'New User',
+          },
+          { onConflict: 'id' }
+        )
+
+      if (upsertErr) {
+        console.error('[createOrganization] Erro ao criar perfil:', upsertErr)
+        return { error: 'Erro ao configurar seu perfil. Tente fazer login novamente.' }
+      }
+    }
+
     // Cria a organização
     const { data: org, error: orgErr } = await db
       .from('organizations')
@@ -44,7 +70,7 @@ export async function createOrganization(input: z.infer<typeof CreateOrganizatio
       .single()
 
     if (orgErr || !org) {
-      console.error('[createOrganization] Erro:', orgErr)
+      console.error('[createOrganization] Erro ao criar org:', orgErr)
       return { error: orgErr?.message || 'Erro ao criar organização' }
     }
 
@@ -61,7 +87,7 @@ export async function createOrganization(input: z.infer<typeof CreateOrganizatio
       console.error('[createOrganization] Erro ao adicionar membro:', memberErr)
       // Cleanup: remove org se membership falhar
       await db.from('organizations').delete().eq('id', org.id)
-      return { error: 'Erro ao configurar permissões. Tente novamente.' }
+      return { error: memberErr.message || 'Erro ao configurar permissões. Tente novamente.' }
     }
 
     return { id: org.id, slug: org.slug }
