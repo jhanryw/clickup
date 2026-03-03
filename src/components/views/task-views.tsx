@@ -8,7 +8,8 @@ import { CalendarView } from "./calendar-view"
 import { CreateTaskDialog } from "@/components/dialogs/create-task-dialog"
 import { TaskDetailDialog } from "@/components/dialogs/task-detail-dialog"
 import { ListStatusDialog } from "@/components/dialogs/list-status-dialog"
-import { LayoutList, KanbanSquare, CalendarDays, SlidersHorizontal } from 'lucide-react'
+import { ListFieldsDialog } from "@/components/dialogs/list-fields-dialog"
+import { LayoutList, KanbanSquare, CalendarDays, SlidersHorizontal, Layers } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 interface Member {
@@ -28,6 +29,7 @@ export function TaskViews({ tasks, statuses, listId, members = [] }: TaskViewsPr
   const [activeTab, setActiveTab] = useState('list')
   const [selectedTask, setSelectedTask] = useState<any | null>(null)
   const [statusDialogOpen, setStatusDialogOpen] = useState(false)
+  const [fieldsDialogOpen, setFieldsDialogOpen] = useState(false)
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -51,6 +53,18 @@ export function TaskViews({ tasks, statuses, listId, members = [] }: TaskViewsPr
           <div className="flex gap-2">
             {listId && (
               <>
+                {/* Custom Fields manager */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setFieldsDialogOpen(true)}
+                  className="border-zinc-700 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 gap-1.5"
+                >
+                  <Layers className="h-3.5 w-3.5" />
+                  Campos
+                </Button>
+
+                {/* Status manager */}
                 <Button
                   variant="outline"
                   size="sm"
@@ -60,6 +74,7 @@ export function TaskViews({ tasks, statuses, listId, members = [] }: TaskViewsPr
                   <SlidersHorizontal className="h-3.5 w-3.5" />
                   Status
                 </Button>
+
                 <CreateTaskDialog listId={listId} statuses={statuses} />
               </>
             )}
@@ -99,6 +114,15 @@ export function TaskViews({ tasks, statuses, listId, members = [] }: TaskViewsPr
           statuses={statuses}
           open={statusDialogOpen}
           onClose={() => setStatusDialogOpen(false)}
+        />
+      )}
+
+      {/* Custom Fields Management Dialog */}
+      {listId && (
+        <ListFieldsDialog
+          listId={listId}
+          open={fieldsDialogOpen}
+          onClose={() => setFieldsDialogOpen(false)}
         />
       )}
     </div>

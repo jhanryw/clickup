@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   ChevronRight, ChevronDown, Folder as FolderIcon, LayoutList,
-  MoreHorizontal, Pencil, Trash2, Check, X, FileText,
+  MoreHorizontal, Pencil, Trash2, Check, X, FileText, Star,
 } from 'lucide-react'
 import { CreateSpaceDialog } from '@/components/dialogs/create-space-dialog'
 import { CreateFolderDialog } from '@/components/dialogs/create-folder-dialog'
@@ -16,6 +16,7 @@ import {
   renameList, deleteList,
 } from '@/app/actions/hierarchy'
 import { createDocument } from '@/app/actions/documents'
+import { toggleFavorite } from '@/app/actions/favorites'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,6 +34,8 @@ interface HierarchySectionProps {
   orgSlug: string
   organizationId: string
   currentListId?: string | null
+  /** IDs already favorited by the current user (entity_type → Set<entity_id>) */
+  favorites?: { space: Set<string>; folder: Set<string>; list: Set<string> }
 }
 
 function RenameInput({ initial, onConfirm, onCancel }: {
@@ -81,7 +84,29 @@ function ConfirmDeletePopup({ label, onConfirm, onCancel }: {
   )
 }
 
-export function HierarchySection({ hierarchy, orgSlug, organizationId, currentListId }: HierarchySectionProps) {
+/** Star button with optimistic toggle */
+function StarButton({
+  isFav,
+  onToggle,
+}: {
+  isFav: boolean
+  onToggle: () => void
+}) {
+  return (
+    <button
+      onClick={(e) => { e.stopPropagation(); e.preventDefault(); onToggle() }}
+      className={`flex h-5 w-5 items-center justify-center rounded text-zinc-600 hover:text-amber-400 transition-colors ${isFav ? 'text-amber-400' : ''}`}
+      title={isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
+    >
+      <Star className={`h-3 w-3 ${isFav ? 'fill-amber-400' : ''}`} />
+    </button>
+  )
+}
+
+export function HierarchySection({
+  hierarchy, orgSlug, organizationId, currentListId,
+  favorites = { space: new Set(), folder: new Set(), list: new Set() },
+}: HierarchySectionProps) {
   const router = useRouter()
   const [, startTransition] = useTransition()
   const [expandedSpaces, setExpandedSpaces] = useState<Set<string>>(() => new Set(hierarchy.map(s => s.id)))
@@ -89,8 +114,33 @@ export function HierarchySection({ hierarchy, orgSlug, organizationId, currentLi
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
+  // Optimistic favorites state
+  const [localFavSpaces, setLocalFavSpaces]   = useState<Set<string>>(favorites.space)
+  const [localFavFolders, setLocalFavFolders] = useState<Set<string>>(favorites.folder)
+  const [localFavLists, setLocalFavLists]     = useState<Set<string>>(favorites.list)
+
   function toggle(setter: React.Dispatch<React.SetStateAction<Set<string>>>, id: string) {
     setter(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+  }
+
+  function handleToggleFav(
+    type: 'space' | 'folder' | 'list',
+    id: string,
+    name: string,
+    color?: string | null,
+  ) {
+    // Optimistic update
+    const setter = type === 'space' ? setLocalFavSpaces : type === 'folder' ? setLocalFavFolders : setLocalFavLists
+    setter((prev) => {
+      const n = new Set(prev)
+      n.has(id) ? n.delete(id) : n.add(id)
+      return n
+    })
+
+    startTransition(async () => {
+      await toggleFavorite(type, id, name, color)
+      router.refresh()
+    })
   }
 
   function handleRename(type: 'space' | 'folder' | 'list', id: string, name: string) {
@@ -142,6 +192,7 @@ export function HierarchySection({ hierarchy, orgSlug, organizationId, currentLi
           {hierarchy.map(space => {
             const isExpanded = expandedSpaces.has(space.id)
             const hasChildren = space.folders.length > 0 || space.direct_lists.length > 0
+            const isFav = localFavSpaces.has(space.id)
 
             return (
               <div key={space.id} className="relative">
@@ -161,6 +212,7 @@ export function HierarchySection({ hierarchy, orgSlug, organizationId, currentLi
 
                   {renamingId !== space.id && (
                     <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <StarButton isFav={isFav} onToggle={() => handleToggleFav('space', space.id, space.name, space.color)} />
                       <CreateListDialog spaceId={space.id} />
                       <CreateFolderDialog spaceId={space.id} />
                       <DropdownMenu>
@@ -191,6 +243,7 @@ export function HierarchySection({ hierarchy, orgSlug, organizationId, currentLi
                   <div className="ml-4 border-l border-zinc-800/60 pl-1 space-y-0.5 mt-0.5">
                     {space.folders.map(folder => {
                       const isFolderExpanded = expandedFolders.has(folder.id)
+                      const isFolderFav = localFavFolders.has(folder.id)
                       return (
                         <div key={folder.id} className="relative">
                           <div className="group flex items-center gap-1 rounded-md px-1 py-1 text-sm text-zinc-300 hover:bg-zinc-800 cursor-pointer">
@@ -206,7 +259,8 @@ export function HierarchySection({ hierarchy, orgSlug, organizationId, currentLi
                             )}
 
                             {renamingId !== folder.id && (
-                              <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                              <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <StarButton isFav={isFolderFav} onToggle={() => handleToggleFav('folder', folder.id, folder.name, folder.color)} />
                                 <CreateListDialog folderId={folder.id} />
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
@@ -239,11 +293,21 @@ export function HierarchySection({ hierarchy, orgSlug, organizationId, currentLi
                           {isFolderExpanded && folder.lists.length > 0 && (
                             <div className="ml-5 pl-1 space-y-0.5 mt-0.5">
                               {folder.lists.map(list => (
-                                <ListItem key={list.id} list={list} orgSlug={orgSlug} isActive={currentListId === list.id}
-                                  isRenaming={renamingId === list.id} isDeleting={deletingId === list.id}
-                                  onRenameStart={() => setRenamingId(list.id)} onDeleteStart={() => setDeletingId(list.id)}
-                                  onRenameConfirm={(n) => handleRename('list', list.id, n)} onRenameCancel={() => setRenamingId(null)}
-                                  onDeleteConfirm={() => handleDelete('list', list.id)} onDeleteCancel={() => setDeletingId(null)}
+                                <ListItem
+                                  key={list.id}
+                                  list={list}
+                                  orgSlug={orgSlug}
+                                  isActive={currentListId === list.id}
+                                  isFav={localFavLists.has(list.id)}
+                                  isRenaming={renamingId === list.id}
+                                  isDeleting={deletingId === list.id}
+                                  onRenameStart={() => setRenamingId(list.id)}
+                                  onDeleteStart={() => setDeletingId(list.id)}
+                                  onRenameConfirm={(n) => handleRename('list', list.id, n)}
+                                  onRenameCancel={() => setRenamingId(null)}
+                                  onDeleteConfirm={() => handleDelete('list', list.id)}
+                                  onDeleteCancel={() => setDeletingId(null)}
+                                  onToggleFav={() => handleToggleFav('list', list.id, list.name, list.color)}
                                 />
                               ))}
                             </div>
@@ -253,11 +317,21 @@ export function HierarchySection({ hierarchy, orgSlug, organizationId, currentLi
                     })}
 
                     {space.direct_lists.map(list => (
-                      <ListItem key={list.id} list={list} orgSlug={orgSlug} isActive={currentListId === list.id}
-                        isRenaming={renamingId === list.id} isDeleting={deletingId === list.id}
-                        onRenameStart={() => setRenamingId(list.id)} onDeleteStart={() => setDeletingId(list.id)}
-                        onRenameConfirm={(n) => handleRename('list', list.id, n)} onRenameCancel={() => setRenamingId(null)}
-                        onDeleteConfirm={() => handleDelete('list', list.id)} onDeleteCancel={() => setDeletingId(null)}
+                      <ListItem
+                        key={list.id}
+                        list={list}
+                        orgSlug={orgSlug}
+                        isActive={currentListId === list.id}
+                        isFav={localFavLists.has(list.id)}
+                        isRenaming={renamingId === list.id}
+                        isDeleting={deletingId === list.id}
+                        onRenameStart={() => setRenamingId(list.id)}
+                        onDeleteStart={() => setDeletingId(list.id)}
+                        onRenameConfirm={(n) => handleRename('list', list.id, n)}
+                        onRenameCancel={() => setRenamingId(null)}
+                        onDeleteConfirm={() => handleDelete('list', list.id)}
+                        onDeleteCancel={() => setDeletingId(null)}
+                        onToggleFav={() => handleToggleFav('list', list.id, list.name, list.color)}
                       />
                     ))}
                   </div>
@@ -271,11 +345,12 @@ export function HierarchySection({ hierarchy, orgSlug, organizationId, currentLi
   )
 }
 
-function ListItem({ list, orgSlug, isActive, isRenaming, isDeleting, onRenameStart, onDeleteStart, onRenameConfirm, onRenameCancel, onDeleteConfirm, onDeleteCancel }: {
-  list: ListNode; orgSlug: string; isActive: boolean; isRenaming: boolean; isDeleting: boolean
+function ListItem({ list, orgSlug, isActive, isFav, isRenaming, isDeleting, onRenameStart, onDeleteStart, onRenameConfirm, onRenameCancel, onDeleteConfirm, onDeleteCancel, onToggleFav }: {
+  list: ListNode; orgSlug: string; isActive: boolean; isFav: boolean; isRenaming: boolean; isDeleting: boolean
   onRenameStart: () => void; onDeleteStart: () => void
   onRenameConfirm: (n: string) => void; onRenameCancel: () => void
   onDeleteConfirm: () => void; onDeleteCancel: () => void
+  onToggleFav: () => void
 }) {
   return (
     <div className="relative group">
@@ -289,22 +364,25 @@ function ListItem({ list, orgSlug, isActive, isRenaming, isDeleting, onRenameSta
         ) : (
           <>
             <Link href={`/org/${orgSlug}?listId=${list.id}`} className="flex-1 truncate">{list.name}</Link>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="opacity-0 group-hover:opacity-100 flex h-4 w-4 items-center justify-center rounded text-zinc-500 hover:text-zinc-300">
-                  <MoreHorizontal className="h-3 w-3" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="bg-zinc-900 border-zinc-800 text-zinc-200 min-w-[140px]" align="end">
-                <DropdownMenuItem onClick={onRenameStart} className="gap-2 cursor-pointer hover:bg-zinc-800 focus:bg-zinc-800">
-                  <Pencil className="h-3.5 w-3.5" /> Renomear
-                </DropdownMenuItem>
-                <DropdownMenuSeparator className="bg-zinc-800" />
-                <DropdownMenuItem onClick={onDeleteStart} className="gap-2 cursor-pointer text-red-400 focus:text-red-400 hover:bg-red-950/50 focus:bg-red-950/50">
-                  <Trash2 className="h-3.5 w-3.5" /> Excluir
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+              <StarButton isFav={isFav} onToggle={onToggleFav} />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="flex h-4 w-4 items-center justify-center rounded text-zinc-500 hover:text-zinc-300">
+                    <MoreHorizontal className="h-3 w-3" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="bg-zinc-900 border-zinc-800 text-zinc-200 min-w-[140px]" align="end">
+                  <DropdownMenuItem onClick={onRenameStart} className="gap-2 cursor-pointer hover:bg-zinc-800 focus:bg-zinc-800">
+                    <Pencil className="h-3.5 w-3.5" /> Renomear
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator className="bg-zinc-800" />
+                  <DropdownMenuItem onClick={onDeleteStart} className="gap-2 cursor-pointer text-red-400 focus:text-red-400 hover:bg-red-950/50 focus:bg-red-950/50">
+                    <Trash2 className="h-3.5 w-3.5" /> Excluir
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </>
         )}
       </div>
