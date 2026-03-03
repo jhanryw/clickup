@@ -2,7 +2,7 @@ import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createServiceClient, withUserContext } from '@/lib/supabase/server'
-import { LayoutDashboard, Settings, Users, FileText } from 'lucide-react'
+import { LayoutDashboard, Settings, Users, FileText, BarChart2 } from 'lucide-react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { HierarchySection } from '@/components/sidebar/hierarchy-section'
 import { WorkspaceProvider } from '@/contexts/workspace-context'
@@ -123,6 +123,10 @@ export default async function OrgLayout({
                         <Link href={`/org/${params.slug}/docs`} className="flex items-center gap-3 rounded-md px-3 py-2 text-[13px] text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-100 transition-colors">
                             <FileText className="h-4 w-4" />
                             <span>Documentos</span>
+                        </Link>
+                        <Link href={`/org/${params.slug}/dashboards`} className="flex items-center gap-3 rounded-md px-3 py-2 text-[13px] text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-100 transition-colors">
+                            <BarChart2 className="h-4 w-4" />
+                            <span>Painéis</span>
                         </Link>
                         {(member.role === 'admin' || member.role === 'owner') && (
                             <Link href={`/org/${params.slug}/settings`} className="flex items-center gap-3 rounded-md px-3 py-2 text-[13px] text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-100 transition-colors">

@@ -327,6 +327,42 @@ export async function setTaskAssignees(taskId: string, userIds: string[]) {
   })
 }
 
+// ---------------------------------------------------------------------------
+// Subtasks
+// ---------------------------------------------------------------------------
+
+/** Busca as subtarefas de uma tarefa pai */
+export async function getSubtasks(parentTaskId: string) {
+  return withPermission(async () => {
+    z.string().uuid().parse(parentTaskId)
+    const db = createServiceClient()
+    const { data, error } = await db
+      .from('tasks')
+      .select('id, title, status_id, priority, custom_statuses(id, name, color, is_closed)')
+      .eq('parent_task_id', parentTaskId)
+      .order('order', { ascending: true })
+
+    if (error) throw new Error(error.message)
+    return data ?? []
+  })
+}
+
+/** Cria uma subtarefa (delega para createTask com parent_task_id) */
+export async function createSubtask(
+  parentTaskId: string,
+  listId: string,
+  title: string,
+  statusId?: string | null,
+) {
+  return createTask({
+    list_id: listId,
+    parent_task_id: parentTaskId,
+    title,
+    status_id: statusId ?? null,
+    assignee_ids: [],
+  })
+}
+
 export async function assignTask(taskId: string, assigneeUserId: string) {
   return withPermission(async () => {
     const userId = getUserId()

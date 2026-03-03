@@ -48,9 +48,11 @@ export function CalendarView({ tasks, statuses, listId }: CalendarViewProps) {
         : null
 
     return (
-        <div className="flex h-full gap-6">
+        <div className="flex h-full gap-6 overflow-hidden">
             {/* Calendar picker */}
-            <div className="flex flex-col rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 shrink-0">
+            <div className="flex flex-col rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 shrink-0 w-[300px]">
+                {/* Wrap DayPicker so nav absolute buttons stay contained */}
+                <div className="relative">
                 <DayPicker
                     mode="single"
                     selected={selectedDay}
@@ -64,11 +66,11 @@ export function CalendarView({ tasks, statuses, listId }: CalendarViewProps) {
                     classNames={{
                         months: 'flex flex-col',
                         month: 'space-y-3',
-                        month_caption: 'flex justify-center pt-1 relative items-center mb-2',
+                        month_caption: 'flex justify-center pt-1 items-center mb-2 px-8',
                         caption_label: 'text-sm font-semibold text-zinc-200 capitalize',
-                        nav: 'flex items-center gap-1',
-                        button_previous: 'h-7 w-7 bg-transparent p-0 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded-md inline-flex items-center justify-center absolute left-1',
-                        button_next: 'h-7 w-7 bg-transparent p-0 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded-md inline-flex items-center justify-center absolute right-1',
+                        nav: 'absolute top-0 left-0 right-0 flex items-center justify-between pointer-events-none',
+                        button_previous: 'h-7 w-7 bg-transparent p-0 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded-md inline-flex items-center justify-center pointer-events-auto',
+                        button_next: 'h-7 w-7 bg-transparent p-0 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded-md inline-flex items-center justify-center pointer-events-auto',
                         month_grid: 'w-full border-collapse',
                         weekdays: 'flex',
                         weekday: 'text-zinc-500 rounded-md w-9 font-medium text-[11px] uppercase',
@@ -81,6 +83,7 @@ export function CalendarView({ tasks, statuses, listId }: CalendarViewProps) {
                         disabled: 'text-zinc-700',
                     }}
                 />
+                </div>
 
                 {/* Legend */}
                 <div className="mt-4 pt-3 border-t border-zinc-800 space-y-1.5">

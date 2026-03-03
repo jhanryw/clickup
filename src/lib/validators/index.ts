@@ -145,7 +145,9 @@ export const FormFieldSchema = z.object({
   required: z.boolean().default(false),
   placeholder: z.string().max(200).optional(),
   options: z.array(z.string()).optional(),
-  maps_to: z.enum(['title', 'description', 'priority', 'due_date']).optional(),
+  maps_to: z.enum(['title', 'description', 'priority', 'due_date', 'assignee_email', 'status_name']).optional(),
+  /** Para mapear a campo customizado: UUID do campo */
+  maps_to_custom_field_id: z.string().uuid().optional(),
 })
 
 export const CreateFormSchema = z.object({
