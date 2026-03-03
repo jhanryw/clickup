@@ -106,6 +106,7 @@ export default async function OrgLayout({
                         orgId={org.id}
                         orgName={org.name}
                         orgSlug={params.slug}
+                        orgLogoUrl={org.logo_url}
                         userRole={member.role}
                     />
 

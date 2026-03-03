@@ -3,21 +3,23 @@
 import { useState, useMemo } from 'react'
 import { DayPicker } from 'react-day-picker'
 import { ptBR } from 'date-fns/locale'
-import { format, isSameDay, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns'
+import { format } from 'date-fns'
 import { Badge } from "@/components/ui/badge"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Calendar as CalendarIcon, Clock } from 'lucide-react'
+import { Calendar as CalendarIcon, Plus } from 'lucide-react'
+import { CreateTaskDialog } from '@/components/dialogs/create-task-dialog'
 
 interface CalendarViewProps {
     tasks: any[]
     statuses: any[]
+    listId?: string | null
 }
 
-export function CalendarView({ tasks, statuses }: CalendarViewProps) {
+export function CalendarView({ tasks, statuses, listId }: CalendarViewProps) {
     const [selectedMonth, setSelectedMonth] = useState(new Date())
     const [selectedDay, setSelectedDay] = useState<Date | undefined>(undefined)
+    const [createForDate, setCreateForDate] = useState<string | null>(null)
 
-    // Map tasks by date
+    // Map tasks by date (due_date)
     const tasksByDate = useMemo(() => {
         const map = new Map<string, any[]>()
         tasks.forEach(t => {
@@ -31,7 +33,7 @@ export function CalendarView({ tasks, statuses }: CalendarViewProps) {
 
     // Days that have tasks (for dot indicators)
     const daysWithTasks = useMemo(() => {
-        return Array.from(tasksByDate.keys()).map(d => new Date(d))
+        return Array.from(tasksByDate.keys()).map(d => new Date(d + 'T12:00:00'))
     }, [tasksByDate])
 
     // Tasks for selected day
@@ -41,9 +43,13 @@ export function CalendarView({ tasks, statuses }: CalendarViewProps) {
         return tasksByDate.get(key) || []
     }, [selectedDay, tasksByDate])
 
+    const selectedDayFormatted = selectedDay
+        ? format(selectedDay, 'yyyy-MM-dd')
+        : null
+
     return (
         <div className="flex h-full gap-6">
-            {/* Calendar */}
+            {/* Calendar picker */}
             <div className="flex flex-col rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 shrink-0">
                 <DayPicker
                     mode="single"
@@ -53,12 +59,8 @@ export function CalendarView({ tasks, statuses }: CalendarViewProps) {
                     onMonthChange={setSelectedMonth}
                     locale={ptBR}
                     showOutsideDays
-                    modifiers={{
-                        hasTasks: daysWithTasks,
-                    }}
-                    modifiersClassNames={{
-                        hasTasks: 'has-tasks-dot',
-                    }}
+                    modifiers={{ hasTasks: daysWithTasks }}
+                    modifiersClassNames={{ hasTasks: 'has-tasks-dot' }}
                     classNames={{
                         months: 'flex flex-col',
                         month: 'space-y-3',
@@ -87,25 +89,44 @@ export function CalendarView({ tasks, statuses }: CalendarViewProps) {
                         <span className="h-1.5 w-1.5 rounded-full bg-indigo-500" />
                         Dia com tarefas
                     </div>
+                    {listId && (
+                        <p className="text-[10px] text-zinc-600 mt-1">
+                            Clique em um dia e depois em <strong className="text-zinc-500">+ Nova Tarefa</strong>
+                        </p>
+                    )}
                 </div>
             </div>
 
             {/* Day Detail Panel */}
             <div className="flex-1 rounded-xl border border-zinc-800 bg-zinc-900/30 overflow-hidden flex flex-col">
-                <div className="px-5 py-4 border-b border-zinc-800 bg-zinc-900/50">
-                    <h3 className="text-base font-semibold text-zinc-200">
-                        {selectedDay
-                            ? format(selectedDay, "d 'de' MMMM, yyyy", { locale: ptBR })
-                            : 'Selecione um dia'
-                        }
-                    </h3>
-                    {selectedDay && (
-                        <p className="text-xs text-zinc-500 mt-0.5">
-                            {selectedDayTasks.length} tarefa{selectedDayTasks.length !== 1 ? 's' : ''}
-                        </p>
+                {/* Header */}
+                <div className="px-5 py-4 border-b border-zinc-800 bg-zinc-900/50 flex items-center justify-between gap-4">
+                    <div>
+                        <h3 className="text-base font-semibold text-zinc-200">
+                            {selectedDay
+                                ? format(selectedDay, "d 'de' MMMM, yyyy", { locale: ptBR })
+                                : 'Selecione um dia'}
+                        </h3>
+                        {selectedDay && (
+                            <p className="text-xs text-zinc-500 mt-0.5">
+                                {selectedDayTasks.length} tarefa{selectedDayTasks.length !== 1 ? 's' : ''}
+                            </p>
+                        )}
+                    </div>
+
+                    {/* Nova Tarefa button — só aparece quando um dia está selecionado e há uma lista */}
+                    {listId && selectedDayFormatted && (
+                        <button
+                            onClick={() => setCreateForDate(selectedDayFormatted)}
+                            className="flex items-center gap-1.5 rounded-md bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 text-xs font-medium text-white transition-colors shrink-0"
+                        >
+                            <Plus className="h-3.5 w-3.5" />
+                            Nova Tarefa
+                        </button>
                     )}
                 </div>
 
+                {/* Task list */}
                 <div className="flex-1 overflow-y-auto p-4">
                     {!selectedDay ? (
                         <div className="flex flex-col items-center justify-center h-full text-zinc-600">
@@ -115,10 +136,19 @@ export function CalendarView({ tasks, statuses }: CalendarViewProps) {
                     ) : selectedDayTasks.length === 0 ? (
                         <div className="flex flex-col items-center justify-center h-full text-zinc-600">
                             <p className="text-sm">Nenhuma tarefa neste dia</p>
+                            {listId && (
+                                <button
+                                    onClick={() => setCreateForDate(selectedDayFormatted!)}
+                                    className="mt-3 flex items-center gap-1.5 text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+                                >
+                                    <Plus className="h-3.5 w-3.5" />
+                                    Criar tarefa para este dia
+                                </button>
+                            )}
                         </div>
                     ) : (
                         <div className="space-y-2">
-                            {selectedDayTasks.map(task => {
+                            {selectedDayTasks.map((task: any) => {
                                 const status = statuses.find((s: any) => s.id === task.status_id)
                                 return (
                                     <div
@@ -166,6 +196,17 @@ export function CalendarView({ tasks, statuses }: CalendarViewProps) {
                     )}
                 </div>
             </div>
+
+            {/* CreateTaskDialog controlado — abre com a data pré-preenchida */}
+            {listId && createForDate && (
+                <CreateTaskDialog
+                    listId={listId}
+                    statuses={statuses}
+                    open={!!createForDate}
+                    onOpenChange={(v) => { if (!v) setCreateForDate(null) }}
+                    initialDueDate={createForDate}
+                />
+            )}
         </div>
     )
 }

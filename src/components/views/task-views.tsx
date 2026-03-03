@@ -76,7 +76,7 @@ export function TaskViews({ tasks, statuses, listId, members = [] }: TaskViewsPr
           </TabsContent>
 
           <TabsContent value="calendar" className="h-full m-0">
-            <CalendarView tasks={tasks} statuses={statuses} />
+            <CalendarView tasks={tasks} statuses={statuses} listId={listId} />
           </TabsContent>
         </div>
       </Tabs>

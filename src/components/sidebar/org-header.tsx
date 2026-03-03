@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import {
-  MoreHorizontal, Pencil, Trash2, Plus, Check, X, AlertTriangle,
+  MoreHorizontal, Pencil, Trash2, Image, AlertTriangle,
 } from 'lucide-react'
 import {
   DropdownMenu,
@@ -17,26 +17,31 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { CreateOrganizationDialog } from '@/components/dialogs/create-organization-dialog'
-import { renameOrganization, deleteOrganization } from '@/app/actions/organization'
+import { renameOrganization, deleteOrganization, updateOrganizationLogo } from '@/app/actions/organization'
 
 interface OrgHeaderProps {
   orgId: string
   orgName: string
   orgSlug: string
+  orgLogoUrl?: string | null
   userRole: string
 }
 
-export function OrgHeader({ orgId, orgName, orgSlug, userRole }: OrgHeaderProps) {
+export function OrgHeader({ orgId, orgName, orgSlug, orgLogoUrl, userRole }: OrgHeaderProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
-  const [renameOpen, setRenameOpen] = useState(false)
-  const [deleteOpen, setDeleteOpen] = useState(false)
-  const [newName, setNewName] = useState(orgName)
-  const [renameError, setRenameError] = useState<string | null>(null)
+  const [renameOpen, setRenameOpen]   = useState(false)
+  const [logoOpen,   setLogoOpen]     = useState(false)
+  const [deleteOpen, setDeleteOpen]   = useState(false)
+
+  const [newName,           setNewName]           = useState(orgName)
+  const [newLogoUrl,        setNewLogoUrl]        = useState(orgLogoUrl ?? '')
+  const [renameError,       setRenameError]       = useState<string | null>(null)
+  const [logoError,         setLogoError]         = useState<string | null>(null)
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
 
-  const isOwner = userRole === 'owner'
+  const isOwner       = userRole === 'owner'
   const isAdminOrOwner = userRole === 'owner' || userRole === 'admin'
 
   function handleRename() {
@@ -47,11 +52,18 @@ export function OrgHeader({ orgId, orgName, orgSlug, userRole }: OrgHeaderProps)
     setRenameError(null)
     startTransition(async () => {
       const result = await renameOrganization(orgId, newName)
-      if (result.error) {
-        setRenameError(result.error as string)
-        return
-      }
+      if (result.error) { setRenameError(result.error as string); return }
       setRenameOpen(false)
+      router.refresh()
+    })
+  }
+
+  function handleLogoSave() {
+    setLogoError(null)
+    startTransition(async () => {
+      const result = await updateOrganizationLogo(orgId, newLogoUrl)
+      if (result.error) { setLogoError(result.error as string); return }
+      setLogoOpen(false)
       router.refresh()
     })
   }
@@ -59,19 +71,26 @@ export function OrgHeader({ orgId, orgName, orgSlug, userRole }: OrgHeaderProps)
   function handleDelete() {
     startTransition(async () => {
       const result = await deleteOrganization(orgId)
-      if (result.error) {
-        alert(result.error as string)
-        return
-      }
+      if (result.error) { alert(result.error as string); return }
       router.push('/')
     })
   }
 
+  // Logo preview: use image if valid URL, otherwise show initial letter
+  const logoPreview = orgLogoUrl ? (
+    <img
+      src={orgLogoUrl}
+      alt={orgName}
+      className="h-8 w-8 rounded-lg object-cover"
+      onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+    />
+  ) : null
+
   return (
     <>
       <div className="flex items-center gap-3 border-b border-zinc-800/60 px-4 py-3.5 hover:bg-zinc-800/30 transition-colors group">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 text-xs font-bold text-white shadow-lg shadow-indigo-500/20">
-          {orgName.substring(0, 1).toUpperCase()}
+        <div className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 text-xs font-bold text-white shadow-lg shadow-indigo-500/20 overflow-hidden">
+          {logoPreview || orgName.substring(0, 1).toUpperCase()}
         </div>
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-zinc-100">{orgName}</p>
@@ -85,12 +104,18 @@ export function OrgHeader({ orgId, orgName, orgSlug, userRole }: OrgHeaderProps)
                 <MoreHorizontal className="h-4 w-4" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent className="bg-zinc-900 border-zinc-800 text-zinc-200 min-w-[180px]" align="end">
+            <DropdownMenuContent className="bg-zinc-900 border-zinc-800 text-zinc-200 min-w-[190px]" align="end">
               <DropdownMenuItem
                 onClick={() => { setNewName(orgName); setRenameOpen(true) }}
                 className="gap-2 cursor-pointer hover:bg-zinc-800 focus:bg-zinc-800"
               >
                 <Pencil className="h-3.5 w-3.5" /> Renomear Organização
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => { setNewLogoUrl(orgLogoUrl ?? ''); setLogoOpen(true) }}
+                className="gap-2 cursor-pointer hover:bg-zinc-800 focus:bg-zinc-800"
+              >
+                <Image className="h-3.5 w-3.5" /> Alterar Logo
               </DropdownMenuItem>
               {isOwner && (
                 <>
@@ -124,9 +149,7 @@ export function OrgHeader({ orgId, orgName, orgSlug, userRole }: OrgHeaderProps)
                 className="bg-zinc-950 border-zinc-700 text-zinc-200"
                 autoFocus
               />
-              {renameError && (
-                <p className="text-xs text-red-400">{renameError}</p>
-              )}
+              {renameError && <p className="text-xs text-red-400">{renameError}</p>}
             </div>
             <div className="flex justify-end gap-3">
               <Button variant="ghost" onClick={() => setRenameOpen(false)} className="text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800">
@@ -134,6 +157,50 @@ export function OrgHeader({ orgId, orgName, orgSlug, userRole }: OrgHeaderProps)
               </Button>
               <Button onClick={handleRename} disabled={isPending} className="bg-indigo-600 hover:bg-indigo-700 text-white">
                 {isPending ? 'Salvando...' : 'Salvar'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Logo Dialog */}
+      <Dialog open={logoOpen} onOpenChange={setLogoOpen}>
+        <DialogContent className="bg-zinc-900 border-zinc-800 text-zinc-100 sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Alterar Logo da Organização</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <Label className="text-zinc-300">URL da imagem</Label>
+              <Input
+                value={newLogoUrl}
+                onChange={(e) => setNewLogoUrl(e.target.value)}
+                placeholder="https://exemplo.com/logo.png"
+                className="bg-zinc-950 border-zinc-700 text-zinc-200 placeholder:text-zinc-600"
+                autoFocus
+              />
+              <p className="text-[11px] text-zinc-500">
+                Use um link público de imagem (PNG, JPG, SVG). Deixe em branco para remover.
+              </p>
+              {newLogoUrl && (
+                <div className="flex items-center gap-3 rounded-lg border border-zinc-700 bg-zinc-950 p-3">
+                  <img
+                    src={newLogoUrl}
+                    alt="Preview"
+                    className="h-10 w-10 rounded-lg object-cover border border-zinc-700"
+                    onError={(e) => { (e.currentTarget as HTMLImageElement).src = '' }}
+                  />
+                  <p className="text-xs text-zinc-500 truncate">{newLogoUrl}</p>
+                </div>
+              )}
+              {logoError && <p className="text-xs text-red-400">{logoError}</p>}
+            </div>
+            <div className="flex justify-end gap-3">
+              <Button variant="ghost" onClick={() => setLogoOpen(false)} className="text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800">
+                Cancelar
+              </Button>
+              <Button onClick={handleLogoSave} disabled={isPending} className="bg-indigo-600 hover:bg-indigo-700 text-white">
+                {isPending ? 'Salvando...' : 'Salvar Logo'}
               </Button>
             </div>
           </div>

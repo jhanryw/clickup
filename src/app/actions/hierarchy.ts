@@ -497,3 +497,62 @@ export async function deleteInvitation(invitationId: string) {
 
 /** @deprecated Use deleteInvitation */
 export const cancelInvitation = deleteInvitation
+
+// ─── REMOVE MEMBER ────────────────────────────────────────────────────
+
+/**
+ * Remove um membro ativo da organização.
+ * - Admin pode remover member/viewer
+ * - Owner pode remover qualquer um (inclusive outros admins)
+ * - Ninguém pode remover a si mesmo
+ * - O último owner não pode ser removido
+ */
+export async function removeMember(orgId: string, targetUserId: string) {
+  return withPermission(async () => {
+    const userId = getUserId()
+
+    if (targetUserId === userId) {
+      throw new Error('Você não pode remover a si mesmo da organização.')
+    }
+
+    const db = createServiceClient()
+
+    // Busca o role do membro alvo
+    const { data: targetMember } = await db
+      .from('organization_members')
+      .select('role')
+      .eq('organization_id', orgId)
+      .eq('user_id', targetUserId)
+      .single()
+
+    if (!targetMember) throw new Error('Membro não encontrado.')
+
+    // Se o alvo é owner, exige que o caller também seja owner
+    if (targetMember.role === 'owner') {
+      await requireOrgRole(userId, orgId, 'owner')
+
+      // Impede remover o único owner
+      const { count } = await db
+        .from('organization_members')
+        .select('*', { count: 'exact', head: true })
+        .eq('organization_id', orgId)
+        .eq('role', 'owner')
+
+      if ((count ?? 0) <= 1) {
+        throw new Error('Não é possível remover o único dono da organização.')
+      }
+    } else {
+      // Para remover admin/member/viewer, basta ser admin ou owner
+      await requireOrgRole(userId, orgId, 'admin')
+    }
+
+    const { error } = await db
+      .from('organization_members')
+      .delete()
+      .eq('organization_id', orgId)
+      .eq('user_id', targetUserId)
+
+    if (error) throw new Error(error.message)
+    return { success: true }
+  })
+}

@@ -13,10 +13,12 @@ import { Plus } from 'lucide-react'
 interface CreateTaskDialogProps {
   listId: string
   statuses: { id: string; name: string; color: string }[]
-  // Modo controlado (ex: Kanban + button)
+  // Modo controlado (ex: Kanban + button, Calendário)
   open?: boolean
   onOpenChange?: (open: boolean) => void
   initialStatusId?: string
+  /** Data pré-preenchida (ex: clique em dia no calendário). Formato: 'yyyy-MM-dd' */
+  initialDueDate?: string
 }
 
 export function CreateTaskDialog({
@@ -25,6 +27,7 @@ export function CreateTaskDialog({
   open: controlledOpen,
   onOpenChange: controlledOnOpenChange,
   initialStatusId,
+  initialDueDate,
 }: CreateTaskDialogProps) {
   const [internalOpen, setInternalOpen] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -160,6 +163,7 @@ export function CreateTaskDialog({
               id="due_date"
               name="due_date"
               type="date"
+              defaultValue={initialDueDate || ''}
               className="bg-zinc-950 border-zinc-700 text-zinc-200"
             />
           </div>

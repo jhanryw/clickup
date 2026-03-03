@@ -33,22 +33,23 @@ export async function createOrganization(input: z.infer<typeof CreateOrganizatio
       return { error: 'Esse slug já está em uso. Escolha outro.' }
     }
 
-    // Garante que o perfil do usuário existe
-    const { data: profile, error: profileErr } = await db
+    // Garante que o perfil do usuário existe (sem @system.local)
+    const { data: profile } = await db
       .from('profiles')
       .select('id')
       .eq('id', userId)
       .single()
 
     if (!profile) {
-      console.log('[createOrganization] Criando perfil para userId:', userId)
+      console.log('[createOrganization] Criando perfil pendente para userId:', userId)
       const { error: upsertErr } = await db
         .from('profiles')
         .upsert(
           {
             id: userId,
-            email: `user_${userId}@system.local`,
-            full_name: 'New User',
+            // Email placeholder — será atualizado no próximo login via callback
+            email: `${userId}@pending.qarvon.com`,
+            full_name: null,
           },
           { onConflict: 'id' }
         )
@@ -129,6 +130,27 @@ export async function deleteOrganization(orgId: string) {
 
     const db = createServiceClient()
     const { error } = await db.from('organizations').delete().eq('id', orgId)
+    if (error) throw new Error(error.message)
+    return { success: true }
+  })
+}
+
+/**
+ * Atualiza a logo (URL) da organização.
+ * Qualquer admin ou owner pode alterar.
+ * Passe logo_url = '' para remover a logo.
+ */
+export async function updateOrganizationLogo(orgId: string, logoUrl: string) {
+  return withPermission(async () => {
+    const userId = getUserId()
+    await requireOrgRole(userId, orgId, 'admin')
+
+    const db = createServiceClient()
+    const { error } = await db
+      .from('organizations')
+      .update({ logo_url: logoUrl.trim() || null })
+      .eq('id', orgId)
+
     if (error) throw new Error(error.message)
     return { success: true }
   })

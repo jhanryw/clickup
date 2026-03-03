@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { inviteMember, deleteInvitation, resendInvitationEmail } from '@/app/actions/hierarchy'
+import { inviteMember, deleteInvitation, resendInvitationEmail, removeMember } from '@/app/actions/hierarchy'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog'
-import { UserPlus, Shield, ShieldCheck, Eye, Crown, Mail, Clock, X, Users, Copy, Check, Trash2, Link2, Send } from 'lucide-react'
+import { UserPlus, Shield, ShieldCheck, Eye, Crown, Mail, Clock, X, Users, Copy, Check, Trash2, Link2, Send, UserMinus } from 'lucide-react'
 
 interface Member {
   userId: string
@@ -32,6 +32,7 @@ interface PendingInvite {
 interface MembersClientProps {
   members: Member[]
   orgId: string
+  currentUserId: string
   currentUserRole: string
   pendingInvites?: PendingInvite[]
 }
@@ -45,7 +46,7 @@ const ROLE_CONFIG: Record<string, { label: string; color: string; icon: any }> =
 
 type Tab = 'members' | 'invites'
 
-export function MembersClient({ members, orgId, currentUserRole, pendingInvites = [] }: MembersClientProps) {
+export function MembersClient({ members, orgId, currentUserId, currentUserRole, pendingInvites = [] }: MembersClientProps) {
   const [inviteOpen, setInviteOpen] = useState(false)
   const [inviteLoading, setInviteLoading] = useState(false)
   const [inviteError, setInviteError] = useState<string | null>(null)
@@ -53,6 +54,8 @@ export function MembersClient({ members, orgId, currentUserRole, pendingInvites 
   const [newInviteToken, setNewInviteToken] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<Tab>('members')
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [removingMemberId, setRemovingMemberId] = useState<string | null>(null)
+  const [removeConfirmId, setRemoveConfirmId] = useState<string | null>(null)
   const [resendingId, setResendingId] = useState<string | null>(null)
   const [resentId, setResentId] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
@@ -100,6 +103,20 @@ export function MembersClient({ members, orgId, currentUserRole, pendingInvites 
         router.refresh()
       }
       setDeletingId(null)
+    })
+  }
+
+  function handleRemoveMember(memberId: string) {
+    setRemovingMemberId(memberId)
+    startTransition(async () => {
+      const result = await removeMember(orgId, memberId)
+      if ('error' in result && result.error) {
+        alert(result.error as string)
+      } else {
+        router.refresh()
+      }
+      setRemovingMemberId(null)
+      setRemoveConfirmId(null)
     })
   }
 
@@ -254,21 +271,29 @@ export function MembersClient({ members, orgId, currentUserRole, pendingInvites 
       {/* Members Tab */}
       {activeTab === 'members' && (
         <div className="rounded-lg border border-zinc-800 bg-zinc-900 overflow-hidden">
-          <div className="grid grid-cols-[1fr_auto_auto] gap-4 px-5 py-3 border-b border-zinc-800 text-xs font-medium text-zinc-500 uppercase tracking-wider">
+          <div className="grid grid-cols-[1fr_auto_auto_auto] gap-4 px-5 py-3 border-b border-zinc-800 text-xs font-medium text-zinc-500 uppercase tracking-wider">
             <span>Membro</span>
             <span className="w-32 text-center">Cargo</span>
-            <span className="w-32 text-right">Entrou em</span>
+            <span className="w-28 text-right">Entrou em</span>
+            {canInvite && <span className="w-10" />}
           </div>
 
           {members.map((member) => {
             const roleConfig = ROLE_CONFIG[member.role] || ROLE_CONFIG.member
             const RoleIcon = roleConfig.icon
             const initials = member.displayName.substring(0, 2).toUpperCase()
+            const isSelf = member.userId === currentUserId
+            const isConfirming = removeConfirmId === member.userId
+            const isRemoving = removingMemberId === member.userId
+            // Can remove: admin can remove member/viewer; owner can remove anyone except self
+            const canRemove = canInvite && !isSelf && (
+              currentUserRole === 'owner' || member.role !== 'owner'
+            )
 
             return (
               <div
                 key={member.userId}
-                className="grid grid-cols-[1fr_auto_auto] gap-4 items-center px-5 py-3 border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-colors last:border-b-0"
+                className="grid grid-cols-[1fr_auto_auto_auto] gap-4 items-center px-5 py-3 border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-colors last:border-b-0"
               >
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-zinc-800 text-xs font-medium text-zinc-300">
@@ -277,7 +302,10 @@ export function MembersClient({ members, orgId, currentUserRole, pendingInvites 
                     ) : initials}
                   </div>
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-zinc-200 truncate">{member.displayName}</p>
+                    <p className="text-sm font-medium text-zinc-200 truncate">
+                      {member.displayName}
+                      {isSelf && <span className="ml-2 text-[10px] text-zinc-500">(você)</span>}
+                    </p>
                     <p className="text-xs text-zinc-500 truncate flex items-center gap-1">
                       <Mail className="h-3 w-3" />
                       {member.email}
@@ -292,11 +320,42 @@ export function MembersClient({ members, orgId, currentUserRole, pendingInvites 
                   </Badge>
                 </div>
 
-                <div className="w-32 text-right">
+                <div className="w-28 text-right">
                   <span className="text-xs text-zinc-500">
                     {new Date(member.joinedAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}
                   </span>
                 </div>
+
+                {canInvite && (
+                  <div className="w-10 flex justify-end">
+                    {canRemove && !isConfirming && (
+                      <button
+                        onClick={() => setRemoveConfirmId(member.userId)}
+                        className="rounded p-1.5 text-zinc-600 hover:text-red-400 hover:bg-red-950/30 transition-colors"
+                        title="Remover membro"
+                      >
+                        <UserMinus className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                    {canRemove && isConfirming && (
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handleRemoveMember(member.userId)}
+                          disabled={isRemoving}
+                          className="rounded px-2 py-1 text-[11px] bg-red-600 text-white hover:bg-red-700 disabled:opacity-40 transition-colors"
+                        >
+                          {isRemoving ? '...' : 'Remover'}
+                        </button>
+                        <button
+                          onClick={() => setRemoveConfirmId(null)}
+                          className="rounded p-1 text-zinc-500 hover:text-zinc-300"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )
           })}

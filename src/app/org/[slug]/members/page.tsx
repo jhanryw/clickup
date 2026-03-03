@@ -77,6 +77,7 @@ export default async function MembersPage({ params }: PageProps) {
       <MembersClient
         members={formattedMembers}
         orgId={org.id}
+        currentUserId={userId}
         currentUserRole={currentMember.role}
         pendingInvites={(pendingInvites || []).map(i => ({
           id: i.id,
