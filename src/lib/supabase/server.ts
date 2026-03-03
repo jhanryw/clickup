@@ -127,6 +127,14 @@ export async function canUserAccessSpace(
 /**
  * Sincroniza o perfil do usuário LogTo no Supabase.
  * Chamado após o login.
+ *
+ * Estratégia de upsert:
+ *  1. Tenta upsert por `id` (caminho comum: login repetido do mesmo usuário).
+ *  2. Se houver conflito de UNIQUE em `email` (outro perfil já usa esse email,
+ *     geralmente um perfil @system.local de sessão anterior com ID diferente),
+ *     atualiza apenas nome e avatar no perfil existente com esse ID.
+ *     O `email` nunca é sobrescrito em perfil de ID diferente para preservar
+ *     a integridade das referências.
  */
 export async function upsertUserProfile(profile: {
   id: string
@@ -137,6 +145,48 @@ export async function upsertUserProfile(profile: {
 }): Promise<void> {
   const db = createServiceClient()
 
+  // Primeiro: verifica se outro perfil já ocupa este email
+  const isSystemEmail = (e: string) =>
+    ['@system.local', '@local', '@logto.local', '@pending.qarvon.com'].some(d =>
+      e.toLowerCase().endsWith(d)
+    )
+
+  const hasRealEmail = profile.email && !isSystemEmail(profile.email)
+
+  if (hasRealEmail) {
+    const { data: emailOwner } = await db
+      .from('profiles')
+      .select('id')
+      .eq('email', profile.email.toLowerCase())
+      .neq('id', profile.id)
+      .maybeSingle()
+
+    if (emailOwner) {
+      // Email já pertence a outro perfil (ex: @system.local migrado ou
+      // perfil criado por outro fluxo). Atualiza só nome/avatar do perfil
+      // atual sem mudar o email do outro.
+      console.warn(
+        '[upsertUserProfile] Email %s já pertence ao perfil %s. ' +
+        'Atualizando apenas nome/avatar do perfil %s.',
+        profile.email, emailOwner.id, profile.id,
+      )
+      await db.from('profiles').upsert(
+        {
+          id: profile.id,
+          // Usa email de placeholder único para não violar UNIQUE
+          email: `${profile.id}@pending.qarvon.com`,
+          full_name: profile.full_name ?? null,
+          avatar_url: profile.avatar_url ?? null,
+          logto_roles: profile.logto_roles ?? [],
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'id' },
+      )
+      return
+    }
+  }
+
+  // Caminho normal: upsert por id (insert ou update do email/nome/avatar)
   const { error } = await db.from('profiles').upsert(
     {
       id: profile.id,
@@ -146,7 +196,7 @@ export async function upsertUserProfile(profile: {
       logto_roles: profile.logto_roles ?? [],
       updated_at: new Date().toISOString(),
     },
-    { onConflict: 'id' }
+    { onConflict: 'id' },
   )
 
   if (error) {

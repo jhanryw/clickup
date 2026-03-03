@@ -34,7 +34,7 @@ export async function sendInviteEmail({
     return { success: false, error: 'RESEND_API_KEY não configurada' }
   }
 
-  const from = process.env.RESEND_FROM_EMAIL || 'Qarvon <noreply@qarvon.com>'
+  const from = process.env.RESEND_FROM_EMAIL || 'Qarvon <jhanry@qarvon.com>'
   const roleLabel = ROLE_LABELS[role] ?? role
 
   const html = `<!DOCTYPE html>
